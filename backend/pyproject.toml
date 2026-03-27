@@ -1,0 +1,8 @@
+[tool.fastapi]
+entrypoint = "app.main:app"
+
+[project]
+name = "bharathcrs-backend"
+version = "1.0.0"
+description = "BharathCRS - Governance-Enforced Civic Complaint Resolution"
+requires-python = ">=3.11"
