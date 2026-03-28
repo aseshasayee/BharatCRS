@@ -259,8 +259,7 @@ input, textarea, select {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-8);
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 50;
   box-shadow: var(--shadow-low);
 }
@@ -714,7 +713,7 @@ input, textarea, select {
 }
 
 /* ============ MAP ============ */
-.map-container { border-radius: var(--radius-lg); overflow: hidden; }
+.map-container { border-radius: var(--radius-lg); overflow: hidden; position: relative; z-index: 10; }
 .leaflet-container { background: var(--color-neutral-100); }
 
 /* ============ UPLOAD ZONE ============ */

@@ -35,13 +35,16 @@ export function timeAgo(isoString) {
 }
 
 /** Domain → emoji mapping */
-export const DOMAIN_EMOJIS = {
-  'Core Infrastructure & Public Works': '🏗️',
-  'Sanitation, Environment & Parks': '♻️',
-  'Transportation & Traffic': '🚦',
-  'Social Infrastructure & Public Health': '🏥',
-  'Emergency, Safety & Accountability': '🚨',
-  'Urban Planning & Real Estate': '🏛️',
+import { HardHat, Leaf, TrafficCone, Hospital, AlertTriangle, Building2 } from 'lucide-react';
+
+/** Domain → icon mapping */
+export const DOMAIN_ICONS = {
+  'Core Infrastructure & Public Works': HardHat,
+  'Sanitation, Environment & Parks': Leaf,
+  'Transportation & Traffic': TrafficCone,
+  'Social Infrastructure & Public Health': Hospital,
+  'Emergency, Safety & Accountability': AlertTriangle,
+  'Urban Planning & Real Estate': Building2,
 };
 
 /** Well-known Chennai wards */

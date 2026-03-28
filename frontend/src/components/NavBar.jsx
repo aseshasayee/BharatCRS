@@ -11,7 +11,6 @@ const NAV_CONFIG = {
   citizen: [
     { label: 'Home', icon: Home, path: '/citizen/home' },
     { label: 'Submit', icon: Zap, path: '/citizen/submit' },
-    { label: 'Map', icon: MapPin, path: '/citizen/map' },
     { label: 'Heatmap', icon: Map, path: '/citizen/heatmap' },
     { label: 'My Complaints', icon: List, path: '/citizen/tracking' },
     { label: 'Profile', icon: User, path: '/citizen/profile' },

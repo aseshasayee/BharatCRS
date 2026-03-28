@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { authService } from '../services/authService';
-import { Shield, ArrowRight, User, Building, Eye, EyeOff, Fingerprint, CheckCircle2 } from 'lucide-react';
+import { Shield, ArrowRight, User, Building, Eye, EyeOff, Fingerprint, CheckCircle2, ShieldCheck, Zap, Bot } from 'lucide-react';
 
 const FEATURES = [
-  { icon: '🛡️', title: 'Secure Aadhaar Auth', desc: 'Identity-linked to your Aadhaar number' },
-  { icon: '⚡', title: 'Real-time Updates', desc: 'Live complaint tracking & status changes' },
-  { icon: '📊', title: 'AI-Powered', desc: 'Intelligent issue classification & routing' },
+  { icon: <ShieldCheck size={20} />, title: 'Secure Aadhaar Auth', desc: 'Identity-linked to your Aadhaar number' },
+  { icon: <Zap size={20} />, title: 'Real-time Updates', desc: 'Live complaint tracking & status changes' },
+  { icon: <Bot size={20} />, title: 'AI-Powered', desc: 'Intelligent issue classification & routing' },
 ];
 
 const ROLES = [
