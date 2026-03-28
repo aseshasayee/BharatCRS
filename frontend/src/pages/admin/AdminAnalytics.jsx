@@ -7,6 +7,20 @@ import { statsService } from '../../services/statsService';
 import { complaintService } from '../../services/complaintService';
 import { Download, TrendingUp, Building, CheckCircle2, BookOpen, Map, Target } from 'lucide-react';
 
+function ChartCard({ title, children }) {
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h3 className="card-title">{title}</h3>
+        <button className="btn btn-secondary btn-sm" style={{ gap: 4 }}>
+          <Download size={12} /> Export
+        </button>
+      </div>
+      <div style={{ padding: '8px 16px 20px' }}>{children}</div>
+    </div>
+  );
+}
+
 export default function AdminAnalytics() {
   const [dateRange, setDateRange] = useState('30d');
   const [deptPerf, setDeptPerf] = useState([]);
@@ -31,7 +45,7 @@ export default function AdminAnalytics() {
       const wardCounts = {};
       const pCounts = {Critical:0,High:0,Medium:0,Low:0};
       (data||[]).forEach(c=>{
-        const w = c.common_metadata?.location?.ward_name;
+        const w = c.spatio_temporal_core?.administrative_unit?.ward_id ? `Ward ${c.spatio_temporal_core.administrative_unit.ward_id}` : c.common_metadata?.location?.ward_name;
         if(w) wardCounts[w]=(wardCounts[w]||0)+1;
         const p = c.priority_assessment?.priority_class;
         if(p && pCounts[p]!==undefined) pCounts[p]++;
