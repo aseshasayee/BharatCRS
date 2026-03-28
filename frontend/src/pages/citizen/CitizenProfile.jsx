@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { complaintService } from '../../services/complaintService';
-import { mapComplaint, formatDate } from '../../utils/helpers';
+import { DOMAIN_ICONS, mapComplaint, formatDate } from '../../utils/helpers';
 import { StatusBadge, PriorityBadge } from '../../components/SharedComponents';
 import { Edit2, ChevronRight, ClipboardList, CheckCircle2, TrendingUp, Clock } from 'lucide-react';
 
@@ -26,14 +26,14 @@ export default function CitizenProfile() {
   const rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
 
   const stats = [
-    { label: 'Total Raised', value: loading ? '...' : total, icon: <ClipboardList size={28} color="var(--color-primary)" /> },
-    { label: 'Resolved', value: loading ? '...' : resolved, icon: <CheckCircle2 size={28} color="var(--color-success)" /> },
-    { label: 'Resolution Rate', value: loading ? '...' : `${rate}%`, icon: <TrendingUp size={28} color="var(--color-warning)" /> },
-    { label: 'Active Issues', value: loading ? '...' : total - resolved, icon: <Clock size={28} color="var(--color-primary)" /> },
+    { label: 'Total Raised', value: loading ? '...' : total, icon: <ClipboardList size={22} color="var(--color-primary)" />, bg: 'var(--color-primary-light)' },
+    { label: 'Resolved', value: loading ? '...' : resolved, icon: <CheckCircle2 size={22} color="var(--color-success)" />, bg: 'var(--color-success-light)' },
+    { label: 'Resolution Rate', value: loading ? '...' : `${rate}%`, icon: <TrendingUp size={22} color="var(--color-warning)" />, bg: 'var(--color-warning-light)' },
+    { label: 'Active Issues', value: loading ? '...' : total - resolved, icon: <Clock size={22} color="var(--color-danger)" />, bg: 'var(--color-danger-light)' },
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', maxWidth: 1400, margin: '0 auto' }}>
       {/* Profile header card */}
       <div className="card">
         <div style={{ background: 'linear-gradient(135deg, var(--color-primary), #3b82f6)', height: 100, borderRadius: '12px 12px 0 0' }} />
@@ -64,9 +64,13 @@ export default function CitizenProfile() {
       <div className="grid-4">
         {stats.map(s => (
           <div key={s.label} className="metric-card">
-            <div style={{ fontSize: 28, marginBottom: 8 }}>{s.icon}</div>
-            <div className="metric-value" style={{ fontSize: 24 }}>{s.value}</div>
-            <div className="metric-label">{s.label}</div>
+            <div className="metric-card-header">
+              <span className="metric-label">{s.label}</span>
+              <div className="metric-icon" style={{ background: s.bg }}>
+                {s.icon}
+              </div>
+            </div>
+            <div className="metric-value">{s.value}</div>
           </div>
         ))}
       </div>
@@ -90,10 +94,18 @@ export default function CitizenProfile() {
               <tbody>
                 {displayComplaints.map(c => (
                   <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/citizen/tracking/${c.id}`)}>
-                    <td><span style={{ fontFamily: 'monospace', fontSize: 11 }}>{c.id}</span></td>
-                    <td style={{ maxWidth: 220 }}><span style={{ fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span></td>
-                    <td><span style={{ fontSize: 12 }}>{c.domain?.split('&')[0]?.trim() || 'N/A'}</span></td>
-                    <td style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>{formatDate(c.submittedAt)}</td>
+                    <td><span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600 }}>{c.id}</span></td>
+                    <td style={{ maxWidth: 300 }}><span style={{ fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.normalized_input?.raw_text || c.title || c.common_metadata?.raw_text || '—'}</span></td>
+                    <td>
+                      <span style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                        {(() => {
+                          const Icon = DOMAIN_ICONS[c.domain] || ClipboardList;
+                          return <Icon size={14} color="var(--color-primary)" />;
+                        })()}
+                        {c.domain?.split('&')[0]?.trim() || 'N/A'}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 13, color: 'var(--color-neutral-600)', fontWeight: 500 }}>{formatDate(c.submittedAt)}</td>
                     <td><StatusBadge status={c.status} /></td>
                     <td><PriorityBadge priority={c.priority} /></td>
                     <td><ChevronRight size={16} color="var(--color-neutral-400)" /></td>
