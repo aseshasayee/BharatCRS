@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { complaintService } from '../../services/complaintService';
-import { formatDateTime, DOMAIN_EMOJIS } from '../../utils/helpers';
+import { formatDateTime, DOMAIN_ICONS } from '../../utils/helpers';
 import { StatusBadge, PriorityBadge } from '../../components/SharedComponents';
 import MapComponent from '../../components/MapComponent';
-import { ArrowLeft, Check, Clock, MapPin, Calendar, Building, BarChart2, CheckCircle2, Hourglass, ClipboardList, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Check, Clock, MapPin, Calendar, Building, BarChart2, CheckCircle2, Hourglass, ClipboardList, MessageSquare, ThumbsUp } from 'lucide-react';
 
 const STATUS_STEPS = ['submitted', 'verified', 'assigned', 'in_progress', 'resolved'];
 const STEP_LABELS = { submitted: 'Submitted', verified: 'Verified', assigned: 'Assigned', in_progress: 'In Progress', resolved: 'Resolved' };
@@ -68,7 +68,7 @@ export default function CitizenTrackingDetail() {
   
   const mappedStatus = STATUS_MAP[rawStatus] || 'submitted';
   const currentStep = STATUS_STEPS.indexOf(mappedStatus);
-  const emoji = DOMAIN_EMOJIS[domain.primary_domain] || '📋';
+  const IconComponent = DOMAIN_ICONS[domain.primary_domain] || ClipboardList;
 
   const lat = loc.latitude;
   const lon = loc.longitude;
@@ -98,7 +98,9 @@ export default function CitizenTrackingDetail() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
             <div>
               <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-neutral-600)', fontFamily: 'monospace', marginBottom: 4 }}>{meta.report_id}</p>
-              <h2 style={{ fontFamily: 'Poppins', fontSize: 20, fontWeight: 700, lineHeight: 1.4 }}>{emoji} {formatSlug(domain.issue_type || domain.sub_domain) || 'Civic Complaint'}</h2>
+              <h2 style={{ fontFamily: 'Poppins', fontSize: 20, fontWeight: 700, lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <IconComponent size={22} color="var(--color-primary)" /> {formatSlug(domain.issue_type || domain.sub_domain) || 'Civic Complaint'}
+              </h2>
               <p style={{ fontSize: 13, color: 'var(--color-neutral-600)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <MapPin size={12} /> {wardText}{loc.address ? ` — ${loc.address}` : ''}
               </p>
@@ -165,7 +167,7 @@ export default function CitizenTrackingDetail() {
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-neutral-600)', marginBottom: 4 }}>DOMAIN</p>
-              <p style={{ fontSize: 14 }}>{emoji} {domain.primary_domain || 'N/A'}</p>
+              <p style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}><IconComponent size={16} color="var(--color-primary)" /> {domain.primary_domain || 'N/A'}</p>
             </div>
             <div>
               <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-neutral-600)', marginBottom: 4 }}>ISSUE TYPE</p>
@@ -179,7 +181,7 @@ export default function CitizenTrackingDetail() {
             )}
             <div>
               <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-neutral-600)', marginBottom: 4 }}>UPVOTES</p>
-              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-danger)' }}>👍 {meta.upvotes || 0}</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: 4 }}><ThumbsUp size={14} /> {meta.upvotes || 0}</p>
             </div>
             {meta.resolved_at && (
               <div>
@@ -208,7 +210,9 @@ export default function CitizenTrackingDetail() {
           <div className="card-header"><h3 className="card-title" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><MessageSquare size={20} /> Resolution Note</h3></div>
           <div className="card-body">
             <div style={{ background: 'var(--color-success-light)', borderRadius: 10, padding: '12px 16px', fontSize: 14, color: 'var(--color-success)', border: '1px solid var(--color-success)22' }}>
-              ✅ {meta.resolution_text}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CheckCircle2 size={16} /> {meta.resolution_text}
+              </div>
             </div>
           </div>
         </div>

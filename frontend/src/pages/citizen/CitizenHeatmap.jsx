@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { complaintService } from '../../services/complaintService';
 import { statsService } from '../../services/statsService';
 import MapComponent from '../../components/MapComponent';
-import { Filter, Flame, Trophy, Lightbulb, TrendingUp, AlertTriangle, Zap, RefreshCw } from 'lucide-react';
+import { Filter, Flame, Trophy, Lightbulb, TrendingUp, AlertTriangle, Zap, RefreshCw, ClipboardList } from 'lucide-react';
+import { DOMAIN_ICONS } from '../../utils/helpers';
 
 // Chennai ward metadata in the same structure as the backend
 const CHENNAI_WARDS = [
@@ -146,14 +147,7 @@ export default function CitizenHeatmap() {
   });
   const topDomains = Object.entries(domainCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
 
-  const DOMAIN_EMOJIS = {
-    "Core Infrastructure & Public Works": "🏗️",
-    "Sanitation, Environment & Parks": "🌿",
-    "Transportation & Traffic": "🚦",
-    "Social Infrastructure & Public Health": "🏥",
-    "Emergency, Safety & Accountability": "🚨",
-    "Urban Planning & Real Estate": "🏛️",
-  };
+  // Removed DOMAIN_EMOJIS definition
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, background: 'var(--color-neutral-50)' }}>
@@ -166,15 +160,15 @@ export default function CitizenHeatmap() {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.06); opacity: 0.8; }
         }
-        .ward-hotspot-row:hover { background: rgba(255,255,255,0.08) !important; transform: translateX(3px); }
-        .ward-hotspot-row { transition: all 0.18s ease; cursor: pointer; }
+        .ward-hotspot-row:hover { background: var(--color-neutral-50) !important; transform: translateX(3px); }
+        .ward-hotspot-row { transition: all 0.18s ease; cursor: pointer; border-left: 2px solid transparent; }
       `}</style>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
-          <h2 style={{ fontFamily: 'Poppins', fontSize: 28, fontWeight: 800, background: 'linear-gradient(135deg, #EF4444, #F97316, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-            🔥 Issue Heatmap
+          <h2 style={{ fontFamily: 'Poppins', fontSize: 28, fontWeight: 800, background: 'linear-gradient(135deg, #EF4444, #F97316, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Flame size={28} color="#EF4444" /> Issue Heatmap
           </h2>
           <p style={{ color: 'var(--color-neutral-600)', fontSize: 14, marginTop: 4 }}>
             Live complaint density across Chennai — updated every 30 seconds
@@ -254,10 +248,10 @@ export default function CitizenHeatmap() {
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 20, alignItems: 'stretch' }}>
         {/* Map with glow overlay */}
-        <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--color-neutral-200)', boxShadow: '0 4px 24px rgba(0,0,0,0.07)' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-neutral-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--color-neutral-200)', boxShadow: '0 4px 24px rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 600 }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-neutral-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <h3 style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Flame size={18} color="#EF4444" /> Complaint Density — Chennai
             </h3>
@@ -270,22 +264,10 @@ export default function CitizenHeatmap() {
               <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>Low</span>
             </div>
           </div>
-          <div style={{ position: 'relative' }}>
-            <MapComponent complaints={complaints} height={500} />
-
-            {/* Multi-radial glow overlays based on hotspots */}
-            {!loading && topHotspots.length > 0 && (
-              <div style={{
-                position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 400,
-                background: [
-                  'radial-gradient(ellipse 20% 14% at 65% 35%, rgba(239,68,68,0.22) 0%, transparent 70%)',
-                  'radial-gradient(ellipse 18% 12% at 55% 55%, rgba(249,115,22,0.18) 0%, transparent 70%)',
-                  'radial-gradient(ellipse 16% 10% at 45% 25%, rgba(251,191,36,0.14) 0%, transparent 60%)',
-                  'radial-gradient(ellipse 22% 16% at 70% 50%, rgba(239,68,68,0.12) 0%, transparent 60%)',
-                  'radial-gradient(ellipse 14% 10% at 35% 70%, rgba(249,115,22,0.10) 0%, transparent 55%)',
-                ].join(', '),
-              }} />
-            )}
+          <div style={{ position: 'relative', flex: 1 }}>
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <MapComponent complaints={complaints} height="100%" mode="heatmap" />
+            </div>
 
             {/* Density legend */}
             <div style={{
@@ -294,11 +276,11 @@ export default function CitizenHeatmap() {
               borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)',
             }}>
               <p style={{ fontSize: 10, fontWeight: 700, marginBottom: 8, color: '#9CA3AF', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Complaint Density</p>
-              <div style={{ position: 'relative', height: 8, width: 140, borderRadius: 6, background: 'linear-gradient(to right, #34D399, #FBBF24, #F97316, #EF4444)', boxShadow: '0 0 10px rgba(239,68,68,0.5)' }} />
+              <div style={{ position: 'relative', height: 8, width: 200, borderRadius: 6, background: 'linear-gradient(to right, #a855f7, #0ea5e9, #22c55e, #eab308, #f97316, #ef4444)', boxShadow: '0 0 10px rgba(0,0,0,0.5)' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                <span style={{ fontSize: 10, color: '#34D399' }}>Low</span>
-                <span style={{ fontSize: 10, color: '#FBBF24' }}>Med</span>
-                <span style={{ fontSize: 10, color: '#EF4444' }}>High</span>
+                <span style={{ fontSize: 10, color: '#a855f7' }}>Low</span>
+                <span style={{ fontSize: 10, color: '#22c55e' }}>Med</span>
+                <span style={{ fontSize: 10, color: '#ef4444' }}>High</span>
               </div>
             </div>
           </div>
@@ -307,22 +289,17 @@ export default function CitizenHeatmap() {
         {/* Right Panel: Hotspots + Domain Breakdown */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Top Hotspot Wards */}
-          <div style={{
-            background: 'linear-gradient(135deg, #0F0F1A, #1A1A2E)',
-            borderRadius: 16, overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.06)',
-            boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-          }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Trophy size={16} color="#FBBF24" />
-              <span style={{ color: 'white', fontWeight: 700, fontSize: 14 }}>Top Hotspot Wards</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6B7280' }}>Live from DB</span>
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Trophy size={18} color="var(--color-primary)" />
+              <span style={{ fontWeight: 700, fontSize: 15 }}>Top Hotspot Wards</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-neutral-500)' }}>Live from DB</span>
             </div>
-            <div style={{ padding: '12px 0' }}>
+            <div className="card-body" style={{ padding: '12px 0' }}>
               {loading ? (
-                <div style={{ padding: 24, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>Loading ward data...</div>
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-neutral-500)', fontSize: 13 }}>Loading ward data...</div>
               ) : topHotspots.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>No data — seed the database first</div>
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-neutral-500)', fontSize: 13 }}>No data — seed the database first</div>
               ) : (
                 topHotspots.map((ward, i) => {
                   const pct = Math.round((ward.count / maxCount) * 100);
@@ -339,12 +316,12 @@ export default function CitizenHeatmap() {
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 11, fontWeight: 800, color: rankColors[i],
                           }}>#{i + 1}</div>
-                          <span style={{ color: 'white', fontWeight: 600, fontSize: 13 }}>{ward.name}</span>
+                          <span style={{ color: 'var(--color-neutral-900)', fontWeight: 600, fontSize: 13 }}>{ward.name}</span>
                         </div>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                           {ward.critical > 0 && (
-                            <span style={{ fontSize: 11, fontWeight: 700, color: '#EF4444', background: 'rgba(239,68,68,0.15)', padding: '2px 6px', borderRadius: 6 }}>
-                              {ward.critical}🔴
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#EF4444', background: 'rgba(239,68,68,0.15)', padding: '2px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 2 }}>
+                              {ward.critical} <AlertTriangle size={10} />
                             </span>
                           )}
                           <span style={{ fontWeight: 800, color: style.color, fontSize: 14 }}>{ward.count}</span>
@@ -362,28 +339,24 @@ export default function CitizenHeatmap() {
             </div>
           </div>
 
-          {/* Domain Breakdown */}
-          <div style={{
-            background: 'white', borderRadius: 16, border: '1px solid var(--color-neutral-200)',
-            overflow: 'hidden',
-          }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-neutral-100)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TrendingUp size={15} color="var(--color-primary)" />
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Issue Category Breakdown</span>
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <TrendingUp size={18} color="var(--color-primary)" />
+              <span style={{ fontWeight: 700, fontSize: 15 }}>Issue Category Breakdown</span>
             </div>
-            <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="card-body" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {loading ? (
                 <p style={{ fontSize: 13, color: 'var(--color-neutral-400)', textAlign: 'center', padding: 16 }}>Loading...</p>
               ) : topDomains.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--color-neutral-400)', padding: 16 }}>No data yet</p>
               ) : topDomains.map(([domain, count]) => {
                 const pct = Math.round((count / totalComplaints) * 100);
-                const emoji = DOMAIN_EMOJIS[domain] || '📋';
+                const IconComponent = DOMAIN_ICONS[domain] || ClipboardList;
                 return (
                   <div key={domain}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-neutral-700)' }}>
-                        {emoji} {domain.split('&')[0].trim()}
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-neutral-700)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <IconComponent size={14} color="var(--color-primary)" /> {domain.split('&')[0].trim()}
                       </span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-neutral-900)' }}>{pct}%</span>
                     </div>
@@ -412,7 +385,7 @@ export default function CitizenHeatmap() {
                 <Lightbulb size={16} color="#EF4444" />
               </div>
               <div>
-                <p style={{ fontWeight: 700, fontSize: 12, color: '#EF4444', marginBottom: 3 }}>⚠️ Active Alerts</p>
+                <p style={{ fontWeight: 700, fontSize: 12, color: '#EF4444', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={12} /> Active Alerts</p>
                 <p style={{ fontSize: 12, color: 'var(--color-neutral-700)', lineHeight: 1.5 }}>
                   <strong>{criticalCount} critical</strong> {criticalCount === 1 ? 'issue requires' : 'issues require'} immediate attention. Top hotspot: <strong>{topHotspots[0]?.name || 'N/A'}</strong> with {topHotspots[0]?.count || 0} complaints.
                 </p>
