@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Map, FileText, BarChart2,
   Home, MapPin, List, Radio, TrendingUp,
-  LogOut, Bell, Check, User, ChevronDown, Zap, AlertTriangle
+  LogOut, Bell, Check, User, ChevronDown, Zap, AlertTriangle, Terminal
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -35,7 +35,7 @@ const ROLE_LABELS = { citizen: 'Citizen', admin: 'Administrator', department: 'D
 const ROLE_COLORS = { citizen: '#10B981', admin: '#3B82F6', department: '#8B5CF6' };
 
 export default function NavBar() {
-  const { role, user, logout } = useApp();
+  const { role, user, logout, showWorkingView, setShowWorkingView } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const [notifOpen, setNotifOpen] = useState(false);
@@ -95,6 +95,28 @@ export default function NavBar() {
 
       {/* Right Actions */}
       <div className="navbar-actions">
+        {/* Transparency Mode Toggle */}
+        <button 
+          onClick={() => setShowWorkingView(!showWorkingView)}
+          title="Toggle UI Transparency / Agent Working View"
+          style={{ 
+            background: showWorkingView ? 'var(--color-primary-light)' : 'transparent',
+            color: showWorkingView ? 'var(--color-primary)' : 'var(--color-neutral-600)',
+            border: `1px solid ${showWorkingView ? 'var(--color-primary)' : 'var(--color-neutral-300)'}`,
+            padding: '4px 10px',
+            borderRadius: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          <Terminal size={14} />
+          {showWorkingView ? 'Agent View: ON' : 'Agent View: OFF'}
+        </button>
+
         {/* Live Indicator */}
         <div className="navbar-live-badge">
           <span className="navbar-live-dot" />

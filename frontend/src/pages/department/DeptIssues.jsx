@@ -6,7 +6,7 @@ import { complaintService } from '../../services/complaintService';
 import { Search, X, Clock, CheckCircle } from 'lucide-react';
 
 export default function DeptIssues() {
-  const { addToast } = useApp();
+  const { addToast, user } = useApp();
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({ priority: '', status: '', deadline: '' });
   const [confirmResolve, setConfirmResolve] = useState(null);
@@ -18,8 +18,11 @@ export default function DeptIssues() {
   const loadIssues = async () => {
     setLoading(true);
     try {
-      // In a real app we'd filter by the logged-in department
-      const data = await complaintService.listComplaints({ limit: 50 });
+      // Filter by the logged-in department
+      const data = await complaintService.listComplaints({ 
+        limit: 100, 
+        department: user?.department 
+      });
       setComplaints(data || []);
     } catch (err) {
       addToast('Failed to load issues', 'error');

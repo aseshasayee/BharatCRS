@@ -53,14 +53,13 @@ def export():
         onnx_path,
         input_names=["input_ids", "attention_mask"],
         output_names=[
-            "domain_logits", "subdomain_logits", "issue_logits",
+            "domain_logits", "issue_logits",
             "severity_pred", "safety_logit", "vulnerable_logit",
         ],
         dynamic_axes={
             "input_ids": {0: "batch_size"},
             "attention_mask": {0: "batch_size"},
             "domain_logits": {0: "batch_size"},
-            "subdomain_logits": {0: "batch_size"},
             "issue_logits": {0: "batch_size"},
             "severity_pred": {0: "batch_size"},
             "safety_logit": {0: "batch_size"},

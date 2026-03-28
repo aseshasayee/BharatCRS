@@ -174,7 +174,7 @@ export default function AdminDashboard() {
                  const id = c.common_metadata?.report_id;
                  const status = c.common_metadata?.status?.toLowerCase() || 'submitted';
                  const priority = c.priority_assessment?.priority_class?.toLowerCase() || 'low';
-                 const title = c.common_metadata?.raw_text || 'No description provided';
+                   const title = c.normalized_input?.issue_summary || c.normalized_input?.raw_text || 'No description provided';
                  const category = c.domain_classification?.primary_domain || 'Unknown';
                  const ward = `Ward ${c.spatio_temporal_core?.administrative_unit?.ward_id || 'Unknown'}`;
                  const submittedAt = c.common_metadata?.submission_timestamp || new Date().toISOString();

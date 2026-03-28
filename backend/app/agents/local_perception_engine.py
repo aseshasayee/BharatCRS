@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 
 # ─── Model Constants (Must match ml/config.py and export_model.py) ────────────
 
-MODEL_NAME = "ai4bharat/IndicBERTv2-MLM-only"
+MODEL_NAME = "google/muril-base-cased"
 MAX_SEQ_LENGTH = 256
 
 # ─── Singleton Loader ────────────────────────────────────────────────────────
@@ -90,24 +90,21 @@ async def predict_local(text, city="Chennai", ward=0, channel="Web App"):
     ort_outputs = session.run(None, ort_inputs)
     
     # Map outputs back by index (match order in export_model.py output_names)
-    # output_names: ["domain_logits", "subdomain_logits", "issue_logits", "severity_pred", "safety_logit", "vulnerable_logit"]
+    # output_names: ["domain_logits", "issue_logits", "severity_pred", "safety_logit", "vulnerable_logit"]
     domain_logits = ort_outputs[0]
-    subdomain_logits = ort_outputs[1]
-    issue_logits = ort_outputs[2]
-    severity_pred = ort_outputs[3]
-    safety_logit = ort_outputs[4]
-    vulnerable_logit = ort_outputs[5]
+    issue_logits = ort_outputs[1]
+    severity_pred = ort_outputs[2]
+    safety_logit = ort_outputs[3]
+    vulnerable_logit = ort_outputs[4]
     
     # Post-process
-    # Domain used BCE in training, so we use sigmoid to get independent probabilities
     def sigmoid(x):
         return 1.0 / (1.0 + np.exp(-x))
     
     domain_probs = sigmoid(domain_logits)
     domain_idx = np.argmax(domain_logits)
     
-    # Subdomain and Issue use Softmax
-    subdomain_idx = np.argmax(subdomain_logits)
+    # Issue uses Softmax
     issue_idx = np.argmax(issue_logits)
     
     # Severity is sigmoid(logit) * 9 + 1 (if the model has sigmoid at end)
@@ -121,16 +118,18 @@ async def predict_local(text, city="Chennai", ward=0, channel="Web App"):
     is_safety = bool(safety_logit[0] > 0)
     is_vuln = bool(vulnerable_logit[0] > 0)
     
-    # Calculate real confidence (probability)
-    # domain_probs already calculated via sigmoid
-    subdomain_probs = softmax(subdomain_logits)
+    # Calculate real confidence (probability) via Softmax
+    def softmax(x):
+        e_x = np.exp(x - np.max(x))
+        return e_x / e_x.sum(axis=-1, keepdims=True)
+
+    domain_probs = sigmoid(domain_logits)
     issue_probs = softmax(issue_logits)
     
-    # Use the confidence of the most specific classification task (issue type)
-    # as the overall confidence, since it drives the entire routing logic.
-    confidence = float(issue_probs[0, issue_idx])
+    # Best guess for overall confidence
+    confidence = float(np.max(issue_probs))
     
-    # Identify top domains (prob > 0.3 or at least the max one if none exceed threshold)
+    # Identify top domains (prob > 0.3)
     domain_indices = np.argsort(domain_probs[0])[::-1]
     top_domains = []
     for idx in domain_indices:
@@ -143,7 +142,7 @@ async def predict_local(text, city="Chennai", ward=0, channel="Web App"):
     return {
         "primary_domain": _LABELS["PRIMARY_DOMAIN_LABELS"][domain_idx] if _LABELS["PRIMARY_DOMAIN_LABELS"] else str(domain_idx),
         "top_domains": top_domains,
-        "sub_domain": _LABELS["SUB_DOMAIN_LABELS"][subdomain_idx] if _LABELS["SUB_DOMAIN_LABELS"] else str(subdomain_idx),
+        "sub_domain": "N/A",  # Not supported by the 5-head Colab model
         "issue_type": _LABELS["ISSUE_TYPE_LABELS"][issue_idx] if _LABELS["ISSUE_TYPE_LABELS"] else str(issue_idx),
         "severity_level": round(severity_level),
         "public_safety_flag": is_safety,

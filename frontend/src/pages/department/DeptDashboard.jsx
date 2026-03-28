@@ -4,10 +4,11 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { statsService } from '../../services/statsService';
 import { complaintService } from '../../services/complaintService';
 import { MetricCard, StatusBadge, PriorityBadge } from '../../components/SharedComponents';
+import { useApp } from '../../context/AppContext';
 import { Clock, AlertTriangle, ClipboardList, CheckCircle2, BarChart2 } from 'lucide-react';
 
 export default function DeptDashboard() {
-  const { addToast } = useApp();
+  const { addToast, user } = useApp();
   const [stats, setStats] = useState({
     assigned: 0,
     completedToday: 0,
@@ -22,7 +23,7 @@ export default function DeptDashboard() {
       try {
         const [statsData, complaintsData] = await Promise.all([
            statsService.getStats(),
-           complaintService.listComplaints({ limit: 5 })
+           complaintService.listComplaints({ limit: 10, department: user?.department })
         ]);
         
         let deptMetrics = null;

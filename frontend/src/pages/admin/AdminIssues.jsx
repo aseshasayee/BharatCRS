@@ -94,7 +94,7 @@ export default function AdminIssues() {
           </select>
           <select className="form-select" style={{ width: 160 }} value={filters.category} onChange={e => setFilters(p => ({ ...p, category: e.target.value }))}>
             <option value="">All Categories</option>
-            {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+            {DOMAINS.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           <button className="btn btn-secondary btn-sm" onClick={() => setFilters({ priority: '', status: '', category: '', ward: '' })}>
             <X size={13} /> Reset
@@ -145,7 +145,7 @@ export default function AdminIssues() {
                  const id = c.common_metadata?.report_id;
                  const status = c.common_metadata?.status?.toLowerCase() || 'submitted';
                  const priority = c.priority_assessment?.priority_class?.toLowerCase() || 'low';
-                 const title = c.common_metadata?.raw_text || 'No description';
+                   const title = c.normalized_input?.issue_summary || c.normalized_input?.raw_text || 'No description';
                  const category = c.domain_classification?.primary_domain || 'Unknown';
                  const ward = `Ward ${c.spatio_temporal_core?.administrative_unit?.ward_id || '?'}`;
                  const assignedDept = c.governance_and_sla?.assigned_department;

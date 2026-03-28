@@ -43,7 +43,7 @@ const PRIORITY_GLOW = {
 function HeatIntensityBar({ pct, priority }) {
   const style = PRIORITY_GLOW[priority] || PRIORITY_GLOW.Medium;
   return (
-    <div style={{ height: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 10, overflow: 'hidden', position: 'relative' }}>
+    <div style={{ height: 10, background: 'var(--color-neutral-100)', borderRadius: 10, overflow: 'hidden', position: 'relative', border: '1px solid rgba(0,0,0,0.03)' }}>
       <div style={{
         height: '100%',
         width: `${pct}%`,
@@ -68,14 +68,27 @@ function HeatIntensityBar({ pct, priority }) {
 function StatPill({ icon, label, value, color }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      background: `${color}11`, border: `1px solid ${color}33`,
-      borderRadius: 12, padding: '12px 16px', flex: 1,
-    }}>
-      <div style={{ color, flexShrink: 0 }}>{icon}</div>
+      display: 'flex', alignItems: 'center', gap: 14,
+      background: 'white',
+      border: '1px solid rgba(0,0,0,0.06)',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+      borderRadius: 20, padding: '16px 20px', flex: 1,
+      transition: 'all 0.3s ease',
+      cursor: 'default'
+    }}
+    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+    >
+      <div style={{
+        color, flexShrink: 0, width: 40, height: 40,
+        background: `${color}15`, borderRadius: '12px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        {icon}
+      </div>
       <div>
-        <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 22, color, lineHeight: 1 }}>{value}</div>
-        <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{label}</div>
+        <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800, fontSize: 24, color: 'var(--color-neutral-900)', lineHeight: 1.1 }}>{value}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-neutral-500)', marginTop: 4, fontWeight: 500 }}>{label}</div>
       </div>
     </div>
   );
@@ -167,10 +180,13 @@ export default function CitizenHeatmap() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
-          <h2 style={{ fontFamily: 'Poppins', fontSize: 28, fontWeight: 800, background: 'linear-gradient(135deg, #EF4444, #F97316, #FBBF24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Flame size={28} color="#EF4444" /> Issue Heatmap
+          <h2 style={{ fontFamily: 'Poppins', fontSize: 28, fontWeight: 800, color: 'var(--color-neutral-900)', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Flame size={24} color="#EF4444" />
+            </div>
+            Issue Heatmap
           </h2>
-          <p style={{ color: 'var(--color-neutral-600)', fontSize: 14, marginTop: 4 }}>
+          <p style={{ color: 'var(--color-neutral-500)', fontSize: 14, marginTop: 8, fontWeight: 500 }}>
             Live complaint density across Chennai — updated every 30 seconds
           </p>
         </div>
@@ -179,12 +195,15 @@ export default function CitizenHeatmap() {
           disabled={loading}
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
-            background: 'none', border: '1.5px solid var(--color-neutral-200)',
-            borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-            color: 'var(--color-neutral-600)',
+            background: 'white', border: '1px solid rgba(0,0,0,0.06)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+            borderRadius: 14, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            color: 'var(--color-neutral-600)', transition: 'all 0.2s ease',
           }}
+          onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+          onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
         >
-          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+          <RefreshCw size={16} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           {loading ? 'Refreshing...' : `Last: ${lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`}
         </button>
       </div>
@@ -198,37 +217,41 @@ export default function CitizenHeatmap() {
       </div>
 
       {/* Filters */}
-      <div style={{
-        background: 'white', borderRadius: 14, padding: '16px 20px',
-        border: '1px solid var(--color-neutral-200)',
+      <div className="card" style={{
+        background: 'white', borderRadius: 20, padding: '16px 20px',
+        border: '1px solid rgba(0,0,0,0.06)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
         display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap',
       }}>
-        <Filter size={15} color="var(--color-neutral-400)" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 16, borderRight: '1px solid var(--color-neutral-200)' }}>
+          <Filter size={18} color="var(--color-neutral-500)" />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-neutral-600)' }}>Filter by</span>
+        </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {STATUS_FILTERS.map(s => (
             <button key={s} onClick={() => setStatusFilter(s)} style={{
-              padding: '5px 12px', borderRadius: 20, border: '1.5px solid',
+              padding: '6px 14px', borderRadius: 20, border: '1.5px solid',
               borderColor: statusFilter === s ? '#1557C0' : 'var(--color-neutral-200)',
-              background: statusFilter === s ? '#EBF1FA' : 'white',
-              color: statusFilter === s ? '#1557C0' : 'var(--color-neutral-600)',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+              background: statusFilter === s ? '#1557C0' : 'white',
+              color: statusFilter === s ? 'white' : 'var(--color-neutral-600)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease',
               textTransform: 'capitalize',
             }}>
               {s === 'all' ? 'All Status' : s.replace('_', ' ')}
             </button>
           ))}
         </div>
-        <div style={{ width: 1, height: 20, background: 'var(--color-neutral-200)' }} />
+        <div style={{ width: 1, height: 24, background: 'var(--color-neutral-200)' }} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {PRIORITY_FILTERS.map(p => {
             const style = PRIORITY_GLOW[p];
             return (
               <button key={p} onClick={() => setPriorityFilter(p)} style={{
-                padding: '5px 12px', borderRadius: 20, border: '1.5px solid',
+                padding: '6px 14px', borderRadius: 20, border: '1.5px solid',
                 borderColor: priorityFilter === p ? (style?.color || '#1557C0') : 'var(--color-neutral-200)',
-                background: priorityFilter === p ? (style?.bg || '#EBF1FA') : 'white',
-                color: priorityFilter === p ? (style?.color || '#1557C0') : 'var(--color-neutral-600)',
-                fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
+                background: priorityFilter === p ? (style?.color || '#1557C0') : 'white',
+                color: priorityFilter === p ? 'white' : 'var(--color-neutral-600)',
+                fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all 0.2s ease',
                 boxShadow: priorityFilter === p && style ? style.glow.split(',')[0] : 'none',
               }}>
                 {p === 'all' ? 'All Priority' : p}
@@ -250,52 +273,53 @@ export default function CitizenHeatmap() {
       {/* Main grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 20, alignItems: 'stretch' }}>
         {/* Map with glow overlay */}
-        <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--color-neutral-200)', boxShadow: '0 4px 24px rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 600 }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-neutral-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-            <h3 style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Flame size={18} color="#EF4444" /> Complaint Density — Chennai
-            </h3>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', boxShadow: '0 0 6px #EF4444' }} />
-              <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>Critical</span>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F97316', boxShadow: '0 0 6px #F97316', marginLeft: 10 }} />
-              <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>High</span>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 6px #10B981', marginLeft: 10 }} />
-              <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>Low</span>
-            </div>
-          </div>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <div style={{ position: 'absolute', inset: 0 }}>
-              <MapComponent complaints={complaints} height="100%" mode="heatmap" />
-            </div>
-
-            {/* Density legend */}
-            <div style={{
-              position: 'absolute', bottom: 16, left: 16, zIndex: 500,
-              background: 'rgba(10,10,20,0.85)', backdropFilter: 'blur(10px)',
-              borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)',
-            }}>
-              <p style={{ fontSize: 10, fontWeight: 700, marginBottom: 8, color: '#9CA3AF', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Complaint Density</p>
-              <div style={{ position: 'relative', height: 8, width: 200, borderRadius: 6, background: 'linear-gradient(to right, #a855f7, #0ea5e9, #22c55e, #eab308, #f97316, #ef4444)', boxShadow: '0 0 10px rgba(0,0,0,0.5)' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                <span style={{ fontSize: 10, color: '#a855f7' }}>Low</span>
-                <span style={{ fontSize: 10, color: '#22c55e' }}>Med</span>
-                <span style={{ fontSize: 10, color: '#ef4444' }}>High</span>
+          <div style={{ background: 'white', borderRadius: 24, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 600 }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <h3 style={{ fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-neutral-900)' }}>
+                <Flame size={18} color="#EF4444" /> Complaint Density — Chennai
+              </h3>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', boxShadow: '0 0 6px #EF4444' }} />
+                <span style={{ fontSize: 11, color: 'var(--color-neutral-600)', fontWeight: 600 }}>Critical</span>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F97316', boxShadow: '0 0 6px #F97316', marginLeft: 10 }} />
+                <span style={{ fontSize: 11, color: 'var(--color-neutral-600)', fontWeight: 600 }}>High</span>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 6px #10B981', marginLeft: 10 }} />
+                <span style={{ fontSize: 11, color: 'var(--color-neutral-600)', fontWeight: 600 }}>Low</span>
               </div>
             </div>
-          </div>
-        </div>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <div style={{ position: 'absolute', inset: 0 }}>
+                <MapComponent complaints={complaints} height="100%" mode="heatmap" />
+              </div>
+
+              {/* Density legend */}
+              <div style={{
+                position: 'absolute', bottom: 16, left: 16, zIndex: 50,
+                background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)',
+                borderRadius: 16, padding: '12px 16px', border: '1px solid rgba(0,0,0,0.06)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+              }}>
+                <p style={{ fontSize: 10, fontWeight: 800, marginBottom: 8, color: 'var(--color-neutral-600)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>COMPLAINT DENSITY</p>
+                <div style={{ position: 'relative', height: 8, width: 220, borderRadius: 6, background: 'linear-gradient(to right, #4ade80, #facc15, #f97316, #ef4444)' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                  <span style={{ fontSize: 10, color: 'var(--color-neutral-500)', fontWeight: 600 }}>Low</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-neutral-500)', fontWeight: 600 }}>Med</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-neutral-500)', fontWeight: 600 }}>High</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
         {/* Right Panel: Hotspots + Domain Breakdown */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Top Hotspot Wards */}
-          <div className="card" style={{ overflow: 'hidden' }}>
-            <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Trophy size={18} color="var(--color-primary)" />
-              <span style={{ fontWeight: 700, fontSize: 15 }}>Top Hotspot Wards</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-neutral-500)' }}>Live from DB</span>
-            </div>
-            <div className="card-body" style={{ padding: '12px 0' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Top Hotspot Wards */}
+            <div style={{ overflow: 'hidden', background: 'white', borderRadius: 24, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderBottom: '1px solid var(--color-neutral-100)' }}>
+                <Trophy size={20} color="var(--color-primary)" />
+                <span style={{ fontWeight: 800, fontSize: 16 }}>Top Hotspot Wards</span>
+                <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-neutral-500)', fontWeight: 500 }}>Live from DB</span>
+              </div>
+              <div style={{ padding: '12px 0' }}>
               {loading ? (
                 <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-neutral-500)', fontSize: 13 }}>Loading ward data...</div>
               ) : topHotspots.length === 0 ? (
@@ -339,12 +363,12 @@ export default function CitizenHeatmap() {
             </div>
           </div>
 
-          <div className="card" style={{ overflow: 'hidden' }}>
-            <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TrendingUp size={18} color="var(--color-primary)" />
-              <span style={{ fontWeight: 700, fontSize: 15 }}>Issue Category Breakdown</span>
+          <div style={{ overflow: 'hidden', background: 'white', borderRadius: 24, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderBottom: '1px solid var(--color-neutral-100)' }}>
+              <TrendingUp size={20} color="var(--color-primary)" />
+              <span style={{ fontWeight: 800, fontSize: 16 }}>Issue Category Breakdown</span>
             </div>
-            <div className="card-body" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               {loading ? (
                 <p style={{ fontSize: 13, color: 'var(--color-neutral-400)', textAlign: 'center', padding: 16 }}>Loading...</p>
               ) : topDomains.length === 0 ? (
@@ -376,18 +400,19 @@ export default function CitizenHeatmap() {
           {/* Insight callout */}
           {!loading && criticalCount > 0 && (
             <div style={{
-              background: 'linear-gradient(135deg, rgba(239,68,68,0.1), rgba(249,115,22,0.08))',
-              border: '1px solid rgba(239,68,68,0.2)',
-              borderRadius: 12, padding: '14px 16px',
-              display: 'flex', alignItems: 'flex-start', gap: 12,
+              background: 'linear-gradient(135deg, rgba(239,68,68,0.05), rgba(249,115,22,0.05))',
+              border: '1px solid rgba(239,68,68,0.15)',
+              boxShadow: '0 4px 12px rgba(239,68,68,0.05)',
+              borderRadius: 24, padding: '20px',
+              display: 'flex', alignItems: 'flex-start', gap: 16,
             }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Lightbulb size={16} color="#EF4444" />
+              <div style={{ width: 44, height: 44, borderRadius: 16, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Lightbulb size={20} color="#EF4444" />
               </div>
               <div>
-                <p style={{ fontWeight: 700, fontSize: 12, color: '#EF4444', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={12} /> Active Alerts</p>
-                <p style={{ fontSize: 12, color: 'var(--color-neutral-700)', lineHeight: 1.5 }}>
-                  <strong>{criticalCount} critical</strong> {criticalCount === 1 ? 'issue requires' : 'issues require'} immediate attention. Top hotspot: <strong>{topHotspots[0]?.name || 'N/A'}</strong> with {topHotspots[0]?.count || 0} complaints.
+                <p style={{ fontWeight: 800, fontSize: 14, color: '#EF4444', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={14} /> Active Alerts</p>
+                <p style={{ fontSize: 13, color: 'var(--color-neutral-700)', lineHeight: 1.6, fontWeight: 500 }}>
+                  <strong style={{ color: '#dc2626' }}>{criticalCount} critical</strong> {criticalCount === 1 ? 'issue requires' : 'issues require'} immediate attention. Top hotspot: <strong style={{ color: 'var(--color-neutral-900)' }}>{topHotspots[0]?.name || 'N/A'}</strong> with <strong style={{ color: 'var(--color-neutral-900)' }}>{topHotspots[0]?.count || 0}</strong> complaints.
                 </p>
               </div>
             </div>

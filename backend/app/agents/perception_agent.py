@@ -322,7 +322,8 @@ async def run_perception_agent(
     # Human review if confidence low OR fuzzy mapping uncertain
     # Softmax probabilities over 44 classes naturally dilute, so >0.40 is highly confident for local engine.
     if provider == "local":
-        needs_human_review = perception.confidence < 0.40 or match_score < 55
+        # 20-class model: e^1 / sum(e^x) is naturally lower. 0.20 is high for 20 classes.
+        needs_human_review = perception.confidence < 0.20 or match_score < 55
     else:
         needs_human_review = perception.confidence < 0.70 or match_score < 55
         

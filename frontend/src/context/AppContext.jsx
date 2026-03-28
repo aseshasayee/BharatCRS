@@ -8,6 +8,7 @@ export function AppProvider({ children }) {
   const [user, setUser] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showWorkingView, setShowWorkingView] = useState(false);
   const [toasts, setToasts] = useState([]);
 
   const login = async (username, password) => {
@@ -36,6 +37,7 @@ export function AppProvider({ children }) {
       role, user, login, logout,
       sidebarCollapsed, setSidebarCollapsed,
       mobileSidebarOpen, setMobileSidebarOpen,
+      showWorkingView, setShowWorkingView,
       toasts, addToast, removeToast,
     }}>
       {children}

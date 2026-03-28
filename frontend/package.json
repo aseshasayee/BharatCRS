@@ -10,8 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^1.16.8",
+    "@vis.gl/react-google-maps": "^1.5.1",
     "leaflet": "^1.9.4",
-    "leaflet.heat": "^0.2.0",
     "lucide-react": "^1.7.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

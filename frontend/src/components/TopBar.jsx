@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Bell, Menu, X, Check } from 'lucide-react';
+import { Bell, Menu, X, Check, Terminal } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function TopBar({ title }) {
-  const { setMobileSidebarOpen, mobileSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useApp();
+  const { setMobileSidebarOpen, mobileSidebarOpen, sidebarCollapsed, setSidebarCollapsed, showWorkingView, setShowWorkingView } = useApp();
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState(NOTIFICATIONS);
 
@@ -28,7 +28,29 @@ export default function TopBar({ title }) {
         <h1 className="page-title">{title}</h1>
       </div>
 
-      <div className="top-bar-right" style={{ position: 'relative' }}>
+      <div className="top-bar-right" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '16px' }}>
+        {/* Transparency Mode Toggle */}
+        <button 
+          onClick={() => setShowWorkingView(!showWorkingView)}
+          title="Toggle UI Transparency / Agent Working View"
+          style={{ 
+            background: showWorkingView ? 'var(--color-primary-light)' : 'transparent',
+            color: showWorkingView ? 'var(--color-primary)' : 'var(--color-neutral-600)',
+            border: `1px solid ${showWorkingView ? 'var(--color-primary)' : 'var(--color-neutral-300)'}`,
+            padding: '4px 10px',
+            borderRadius: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          <Terminal size={14} />
+          {showWorkingView ? 'Agent View: ON' : 'Agent View: OFF'}
+        </button>
+
         {/* Notification Bell */}
         <button
           onClick={() => setNotifOpen(!notifOpen)}

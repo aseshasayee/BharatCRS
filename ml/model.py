@@ -54,15 +54,8 @@ class MultiTaskCivicClassifier(nn.Module):
             nn.Linear(256, num_domains),
         )
 
-        self.subdomain_head = nn.Sequential(
-            nn.Linear(512, 256),
-            nn.GELU(),
-            nn.Dropout(hidden_dropout),
-            nn.Linear(256, num_subdomains),
-        )
-
         self.issue_type_head = nn.Sequential(
-            nn.Linear(512 + num_domains, 256),  # Input size increased to include domain logits
+            nn.Linear(512 + num_domains, 256),
             nn.GELU(),
             nn.Dropout(hidden_dropout),
             nn.Linear(256, num_issue_types),
@@ -74,7 +67,7 @@ class MultiTaskCivicClassifier(nn.Module):
             nn.GELU(),
             nn.Dropout(hidden_dropout),
             nn.Linear(128, 1),
-            nn.Sigmoid(),  # Output in [0, 1]
+            nn.Sigmoid(),
         )
 
         # ── Binary heads ──
@@ -93,33 +86,19 @@ class MultiTaskCivicClassifier(nn.Module):
         )
 
     def forward(self, input_ids, attention_mask):
-        """
-        Returns a dict of logits/predictions for each task head.
-        """
-        # Encode
-        outputs = self.encoder(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-        )
+        """Returns a dict of 5 tasks."""
+        outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+        cls_output = outputs.last_hidden_state[:, 0, :]
+        shared = self.shared_projection(cls_output)
 
-        # [CLS] token representation
-        cls_output = outputs.last_hidden_state[:, 0, :]  # (batch, hidden_size)
-
-        # Shared projection
-        shared = self.shared_projection(cls_output)  # (batch, 512)
-
-        # Predictions
         domain_logits = self.domain_head(shared)
-        subdomain_logits = self.subdomain_head(shared)
         
-        # ── Hierarchical conditioning for issue_type ──
-        # Concatenate shared representation with domain logits to give the head 'context'
+        # Hierarchical conditioning
         issue_input = torch.cat([shared, domain_logits.detach()], dim=-1)
         issue_logits = self.issue_type_head(issue_input)
 
         return {
             "domain_logits": domain_logits,
-            "subdomain_logits": subdomain_logits,
             "issue_logits": issue_logits,
             "severity_pred": self.severity_head(shared).squeeze(-1),
             "safety_logit": self.safety_head(shared).squeeze(-1),

@@ -1,74 +1,135 @@
-import { useEffect, useRef } from 'react';
-import L from 'leaflet';
-import 'leaflet.heat';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import {
+  APIProvider,
+  Map,
+  useMap,
+  useMapsLibrary,
+  InfoWindow
+} from '@vis.gl/react-google-maps';
 
-// Fix Leaflet default marker icons
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const CHENNAI_CENTER = { lat: 13.0827, lng: 80.2707 };
 
 const PRIORITY_COLORS = {
   Critical: '#7C3AED',
-  High: '#DC2626',
-  Medium: '#D97706',
-  Low: '#16A34A',
-  high: '#DC2626',
-  medium: '#D97706',
-  low: '#16A34A',
+  High:     '#DC2626',
+  Medium:   '#D97706',
+  Low:      '#16A34A',
   resolved: '#16A34A',
-  submitted: '#6B7280',
-  verified: '#6B7280',
 };
 
-function makePin(color) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="
-      width:16px;height:16px;border-radius:50%;
-      background:${color};border:2px solid white;
-      box-shadow:0 2px 6px rgba(0,0,0,0.35);
-    "></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-  });
-}
+// ── Robust Coordinate Extraction ──────────────────────────────────────────────
 
-/** Extract lat/lon from either the real API schema or the mapComplaint-mapped schema */
 function extractLatLon(c) {
-  // Mapped schema (from mapComplaint helper): c.lat, c.lon
-  if (typeof c.lat === 'number' && typeof c.lon === 'number') return [c.lat, c.lon];
-  // Real API schema: c.spatio_temporal_core.location.latitude/longitude
-  const spatioLoc = c.spatio_temporal_core?.location;
-  if (spatioLoc && typeof spatioLoc.latitude === 'number' && typeof spatioLoc.longitude === 'number') {
-    return [spatioLoc.latitude, spatioLoc.longitude];
+  if (!c) return null;
+  let lat = c.lat ?? c.latitude ?? c.common_metadata?.location?.latitude;
+  let lon = c.lon ?? c.lng ?? c.longitude ?? c.common_metadata?.location?.longitude;
+
+  if (lat == null || lon == null) {
+      const loc = c.spatio_temporal_core?.location || c.spatio_temporal_core?.gps;
+      if (loc) {
+          lat = loc.latitude ?? loc.lat;
+          lon = loc.longitude ?? loc.lon;
+      }
   }
-  // Legacy mockData schema: c.lat, c.lng
-  if (typeof c.lat === 'number' && typeof c.lng === 'number') return [c.lat, c.lng];
-  // spatio_temporal_core legacy schema
-  const s = c.spatio_temporal_core?.gps;
-  if (s && typeof s.latitude === 'number' && typeof s.longitude === 'number') {
-    return [s.latitude, s.longitude];
+
+  if (lat != null && lon != null) {
+    const plat = parseFloat(lat);
+    const plon = parseFloat(lon);
+    if (!isNaN(plat) && !isNaN(plon)) return { lat: plat, lng: plon };
   }
   return null;
 }
 
-/** Extract display fields from either schema */
 function extractDisplay(c) {
-  const id = c.id || c.common_metadata?.report_id || '—';
-  const title = c.normalized_input?.raw_text || c.title || c.common_metadata?.raw_text || 'Complaint';
-  const wardId = c.spatio_temporal_core?.administrative_unit?.ward_id;
-  const ward = wardId ? `Ward ${wardId}` : '';
-  const status = c.status || c.common_metadata?.status || 'submitted';
-  const priority = c.priority || c.priority_assessment?.priority_class || 'Low';
-  return { id, title, ward, status, priority };
+  return {
+    id: c.id || c.common_metadata?.report_id || '—',
+    title: c.title || c.common_metadata?.raw_text || 'Issue',
+    status: c.status || c.common_metadata?.status || 'submitted',
+    priority: c.priority || c.priority_assessment?.priority_class || 'Low',
+    ward: c.ward || c.common_metadata?.location?.ward_name || '',
+  };
 }
 
-// Chennai center — default when no explicit center given
-const CHENNAI_CENTER = [13.0827, 80.2707];
+// ── Low-level Marker Component (Using google.maps.Marker directly) ───────────
+
+function DirectMarker({ complaint, onClick }) {
+  const map = useMap();
+  const markerRef = useRef(null);
+  const pos = extractLatLon(complaint);
+
+  useEffect(() => {
+    if (!map || !pos) return;
+
+    const { priority, status } = extractDisplay(complaint);
+    const color = status === 'resolved' ? PRIORITY_COLORS.resolved : (PRIORITY_COLORS[priority] || '#64748b');
+
+    // Create the marker using the global google object
+    markerRef.current = new google.maps.Marker({
+      position: pos,
+      map: map,
+      title: extractDisplay(complaint).id,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: color,
+        fillOpacity: 1,
+        strokeColor: '#FFFFFF',
+        strokeWeight: 2,
+        scale: 8
+      }
+    });
+
+    const listener = markerRef.current.addListener('click', () => {
+      onClick?.(complaint);
+    });
+
+    return () => {
+      if (markerRef.current) {
+        google.maps.event.removeListener(listener);
+        markerRef.current.setMap(null);
+        markerRef.current = null;
+      }
+    };
+  }, [map, pos]); // Re-run if map or position change
+
+  return null;
+}
+
+// ── Heatmap Layer ─────────────────────────────────────────────────────────────
+
+function HeatmapLayer({ complaints }) {
+  const map = useMap();
+  const visualization = useMapsLibrary('visualization');
+  const layerRef = useRef(null);
+
+  useEffect(() => {
+    if (!map || !visualization || !complaints.length) return;
+
+    const points = complaints.map(c => {
+      const p = extractLatLon(c);
+      if (!p) return null;
+      return { location: new google.maps.LatLng(p.lat, p.lng), weight: 2 };
+    }).filter(Boolean);
+
+    if (!layerRef.current) {
+      layerRef.current = new visualization.HeatmapLayer({
+        radius: 30,
+        opacity: 0.8,
+      });
+    }
+    layerRef.current.setData(points);
+    layerRef.current.setMap(map);
+
+    return () => {
+      if (layerRef.current) layerRef.current.setMap(null);
+    };
+  }, [map, visualization, complaints]);
+
+  return null;
+}
+
+// ── Main Map Component ────────────────────────────────────────────────────────
 
 export default function MapComponent({
   complaints = [],
@@ -78,104 +139,51 @@ export default function MapComponent({
   zoom = 12,
   mode = 'markers',
 }) {
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const markersRef = useRef([]);
-  const heatmapLayerRef = useRef(null);
+  const apiKey = import.meta.env.VITE_MAPS_API_KEY;
+  const [selected, setSelected] = useState(null);
 
-  // Auto-detect a sensible center if not provided
-  const resolvedCenter = center || CHENNAI_CENTER;
+  const resolvedCenter = useMemo(() => {
+    if (center && Array.isArray(center)) return { lat: center[0], lng: center[1] };
+    return CHENNAI_CENTER;
+  }, [center]);
 
-  useEffect(() => {
-    if (mapInstanceRef.current) return;
-    const map = L.map(mapRef.current, { center: resolvedCenter, zoom, zoomControl: true, scrollWheelZoom: false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(map);
-    mapInstanceRef.current = map;
-    
-    // Fix resize tile rendering bugs perfectly via ResizeObserver
-    const ro = new ResizeObserver(() => {
-      if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
-    });
-    if (mapRef.current) ro.observe(mapRef.current);
-
-    return () => { 
-      ro.disconnect();
-      map.remove(); 
-      mapInstanceRef.current = null; 
-    };
-  }, [resolvedCenter, zoom]);
-
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    // Clear old markers and layers
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-    if (heatmapLayerRef.current) {
-      mapInstanceRef.current.removeLayer(heatmapLayerRef.current);
-      heatmapLayerRef.current = null;
-    }
-
-    if (mode === 'heatmap') {
-      const heatPoints = [];
-      complaints.forEach(c => {
-        const coords = extractLatLon(c);
-        if (!coords) return;
-        
-        // Use additive intensity instead of absolute max. 
-        // This causes overlapping areas to naturally build up to red, like weather maps.
-        let intensity = 0.15; // Low
-        const { priority } = extractDisplay(c);
-        if (priority === 'Critical') intensity = 0.6;
-        else if (priority === 'High') intensity = 0.4;
-        else if (priority === 'Medium') intensity = 0.25;
-        
-        heatPoints.push([coords[0], coords[1], intensity]);
-      });
-
-      if (heatPoints.length > 0 && typeof L.heatLayer === 'function') {
-        heatmapLayerRef.current = L.heatLayer(heatPoints, {
-          radius: 60, // Large radius so areas blend smoothly together
-          blur: 45,   // High blur for weather-like continuous color spreading
-          maxZoom: 13,
-          max: 1.2,   // Need to accumulate multiple points to reach peak "Red"
-          gradient: {
-            0.15: '#a855f7', // purple (low/edge)
-            0.35: '#0ea5e9', // cyan
-            0.55: '#22c55e', // green
-            0.75: '#eab308', // yellow
-            0.90: '#f97316', // orange
-            1.00: '#ef4444'  // red (high density)
-          }
-        }).addTo(mapInstanceRef.current);
-      }
-    } else {
-      complaints.forEach(c => {
-        const coords = extractLatLon(c);
-        if (!coords) return; // skip complaints with no valid coordinates
-
-        const { id, title, ward, status, priority } = extractDisplay(c);
-        const color = status === 'resolved'
-          ? PRIORITY_COLORS.resolved
-          : (PRIORITY_COLORS[priority] || '#6B7280');
-
-        try {
-          const marker = L.marker(coords, { icon: makePin(color) })
-            .addTo(mapInstanceRef.current)
-            .bindPopup(`<strong style="font-size:12px">${id}</strong><br/><span style="font-size:12px">${title.substring(0, 80)}${title.length > 80 ? '…' : ''}</span><br/><small style="color:#6B7280">${ward}</small>`);
-          if (onPinClick) marker.on('click', () => onPinClick(c));
-          markersRef.current.push(marker);
-        } catch (e) {
-          // Silently skip invalid markers
-        }
-      });
-    }
-  }, [complaints, onPinClick, mode]);
+  if (!apiKey) return <div style={{ height, background: '#eee' }}>API Key Missing</div>;
 
   return (
-    <div className="map-container" style={{ height: height === '100%' ? '100%' : height, width: '100%', position: 'relative' }}>
-      <div ref={mapRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+    <div style={{ width: '100%', height: height === '100%' ? '100%' : height, position: 'relative' }}>
+      <APIProvider apiKey={apiKey} libraries={['visualization', 'marker']}>
+        <Map
+          defaultCenter={resolvedCenter}
+          defaultZoom={zoom}
+          gestureHandling="greedy"
+          disableDefaultUI={false}
+        >
+          {/* Heatmap */}
+          {(mode === 'heatmap' || mode === 'both' || mode === 'all') && <HeatmapLayer complaints={complaints} />}
+
+          {/* Markers */}
+          {mode !== 'heatmap_only' && (complaints || []).map((c, i) => (
+            <DirectMarker 
+              key={`${extractDisplay(c).id}-${i}`} 
+              complaint={c} 
+              onClick={(comp) => {
+                setSelected(comp);
+                onPinClick?.(comp);
+              }} 
+            />
+          ))}
+
+          {/* Info Window */}
+          {selected && (
+            <InfoWindow position={extractLatLon(selected)} onCloseClick={() => setSelected(null)}>
+              <div style={{ padding: 4 }}>
+                <p style={{ fontWeight: 700 }}>{extractDisplay(selected).id}</p>
+                <p style={{ fontSize: 12 }}>{extractDisplay(selected).title}</p>
+              </div>
+            </InfoWindow>
+          )}
+        </Map>
+      </APIProvider>
     </div>
   );
 }
