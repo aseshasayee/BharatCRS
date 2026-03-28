@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext';
 import { Pause, Play, Filter, Volume2, VolumeX, Circle, MapPin, User, Clock } from 'lucide-react';
 
 export default function DeptLive() {
-  const { addToast } = useApp();
+  const { addToast, user } = useApp();
   const [paused, setPaused] = useState(false);
   const [sound, setSound] = useState(false);
   const [filterHigh, setFilterHigh] = useState(false);
@@ -15,7 +15,7 @@ export default function DeptLive() {
   const [newCount, setNewCount] = useState(0);
 
   const fetchIssues = () => {
-    complaintService.listComplaints({ limit: 30 })
+    complaintService.listComplaints({ limit: 30, department: user?.department })
       .then(data => setIssues((data || []).map(mapComplaint)))
       .catch(console.error);
   };
@@ -26,7 +26,7 @@ export default function DeptLive() {
     fetchIssues();
     if (paused) return;
     const timer = setInterval(() => {
-      complaintService.listComplaints({ limit: 30 })
+      complaintService.listComplaints({ limit: 30, department: user?.department })
         .then(data => {
           const fresh = (data || []).map(mapComplaint);
           setIssues(fresh);
@@ -35,7 +35,7 @@ export default function DeptLive() {
         }).catch(() => {});
     }, 30000);
     return () => clearInterval(timer);
-  }, [paused]);
+  }, [paused, user?.department]);
 
   const displayed = (filterHigh ? issues.filter(i => i.priority === 'Critical' || i.priority === 'High') : issues);
 

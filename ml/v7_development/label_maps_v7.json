@@ -1,0 +1,33 @@
+{
+  "primary_domain_labels": [
+    "Core Infrastructure & Public Works",
+    "Emergency, Safety & Accountability",
+    "Sanitation, Environment & Parks",
+    "Social Infrastructure & Public Health",
+    "Transportation & Traffic",
+    "Urban Planning & Real Estate"
+  ],
+  "issue_type_labels": [
+    "civic_corruption",
+    "drainage_sewage",
+    "electrical_hazard",
+    "encroachment",
+    "environmental_pollution",
+    "flooding",
+    "illegal_construction",
+    "parking_violation",
+    "pedestrian_safety",
+    "public_health_service",
+    "public_transport_failure",
+    "road_damage",
+    "school_infrastructure",
+    "street_lighting_failure",
+    "structural_collapse_risk",
+    "traffic_signal_fault",
+    "unsafe_structure",
+    "vector_pest_control",
+    "waste_management",
+    "water_supply_failure"
+  ],
+  "max_seq_length": 256
+}

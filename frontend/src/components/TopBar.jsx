@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Bell, Menu, X, Check, Terminal } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { DEPARTMENTS } from '../utils/helpers';
 
 export default function TopBar({ title }) {
-  const { setMobileSidebarOpen, mobileSidebarOpen, sidebarCollapsed, setSidebarCollapsed, showWorkingView, setShowWorkingView } = useApp();
+  const { role, user, setUser, setMobileSidebarOpen, mobileSidebarOpen, sidebarCollapsed, setSidebarCollapsed, showWorkingView, setShowWorkingView } = useApp();
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState(NOTIFICATIONS);
 

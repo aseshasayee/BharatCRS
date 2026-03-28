@@ -34,7 +34,7 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      role, user, login, logout,
+      role, user, setUser, login, logout,
       sidebarCollapsed, setSidebarCollapsed,
       mobileSidebarOpen, setMobileSidebarOpen,
       showWorkingView, setShowWorkingView,

@@ -6,6 +6,7 @@ import { complaintService } from '../../services/complaintService';
 import { MetricCard, StatusBadge, PriorityBadge } from '../../components/SharedComponents';
 import { useApp } from '../../context/AppContext';
 import { Clock, AlertTriangle, ClipboardList, CheckCircle2, BarChart2 } from 'lucide-react';
+import { CHART_DEPT_SLA } from '../../data/mockData';
 
 export default function DeptDashboard() {
   const { addToast, user } = useApp();
@@ -28,7 +29,7 @@ export default function DeptDashboard() {
         
         let deptMetrics = null;
         if(statsData.department_metrics && statsData.department_metrics.length > 0) {
-            deptMetrics = statsData.department_metrics[0];
+            deptMetrics = statsData.department_metrics.find(d => d.department_id === user?.department) || statsData.department_metrics[0];
         }
 
         setStats({
@@ -47,7 +48,7 @@ export default function DeptDashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [user?.department]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -91,8 +92,8 @@ export default function DeptDashboard() {
             const id = c.common_metadata?.report_id;
             const status = c.common_metadata?.status?.toLowerCase() || 'submitted';
             const priority = c.priority_assessment?.priority_class?.toLowerCase() || 'low';
-            const title = c.common_metadata?.raw_text || 'No description provided';
-            
+            const title = c.normalized_input?.issue_summary || c.normalized_input?.raw_text || 'No description provided';
+
             const slaHours = c.governance_and_sla?.sla_hours || 48;
             const t = new Date(c.common_metadata?.submission_timestamp);
             t.setHours(t.getHours() + slaHours);

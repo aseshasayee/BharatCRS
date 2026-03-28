@@ -31,7 +31,7 @@ export default function DeptIssues() {
     }
   };
 
-  useEffect(() => { loadIssues(); }, []);
+  useEffect(() => { loadIssues(); }, [user?.department]);
 
   const filtered = complaints.filter(c => {
     const status = c.common_metadata?.status || '';

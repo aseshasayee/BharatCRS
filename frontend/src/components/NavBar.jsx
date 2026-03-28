@@ -6,6 +6,8 @@ import {
   LogOut, Bell, Check, User, ChevronDown, Zap, AlertTriangle, Terminal
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { DEPARTMENTS } from '../utils/helpers';
+import { complaintService } from '../services/complaintService';
 
 const NAV_CONFIG = {
   citizen: [
@@ -35,12 +37,13 @@ const ROLE_LABELS = { citizen: 'Citizen', admin: 'Administrator', department: 'D
 const ROLE_COLORS = { citizen: '#10B981', admin: '#3B82F6', department: '#8B5CF6' };
 
 export default function NavBar() {
-  const { role, user, logout, showWorkingView, setShowWorkingView } = useApp();
+  const { role, user, setUser, logout, showWorkingView, setShowWorkingView } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
+  const [deptCounts, setDeptCounts] = useState({});
   const notifRef = useRef(null);
   const userRef = useRef(null);
 
@@ -57,6 +60,24 @@ export default function NavBar() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Fetch department issue counts
+  useEffect(() => {
+    if (role === 'department') {
+      complaintService.listComplaints({ limit: 500 }).then(data => {
+        const counts = {};
+        (data || []).forEach(c => {
+          const d = c.governance_and_sla?.assigned_department;
+          // Only count active issues
+          const status = c.common_metadata?.status?.toLowerCase();
+          if (d && status !== 'resolved' && status !== 'rejected') {
+            counts[d] = (counts[d] || 0) + 1;
+          }
+        });
+        setDeptCounts(counts);
+      }).catch(console.error);
+    }
+  }, [role]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -95,6 +116,31 @@ export default function NavBar() {
 
       {/* Right Actions */}
       <div className="navbar-actions">
+        {role === 'department' && (
+          <select
+            value={user?.department || ''}
+            onChange={(e) => setUser({ ...user, department: e.target.value })}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '6px',
+              border: '1px solid var(--color-neutral-300)',
+              backgroundColor: 'white',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: 'var(--color-neutral-700)',
+              cursor: 'pointer',
+              marginRight: '8px'
+            }}
+          >
+            <option value="">All Departments</option>
+            {DEPARTMENTS.map(dept => (
+              <option key={dept} value={dept}>
+                {dept} {deptCounts[dept] ? `(${deptCounts[dept]})` : '(0)'}
+              </option>
+            ))}
+          </select>
+        )}
+
         {/* Transparency Mode Toggle */}
         <button 
           onClick={() => setShowWorkingView(!showWorkingView)}
