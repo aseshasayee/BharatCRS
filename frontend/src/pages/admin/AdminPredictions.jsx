@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { PREDICTIONS, COMPLAINTS } from '../../data/mockData';
+import { complaintService } from '../../services/complaintService';
+import { mapComplaint } from '../../utils/helpers';
 import MapComponent from '../../components/MapComponent';
 import { CheckCircle, X, Brain, Clock, Calendar, Map, Flame, TrendingUp, Lightbulb } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -22,7 +23,23 @@ export default function AdminPredictions() {
   const { addToast } = useApp();
   const [days, setDays] = useState(7);
   const [suggestions, setSuggestions] = useState(SUGGESTIONS);
-  const [toggle, setToggle] = useState('predicted'); // predicted | current
+  const [toggle, setToggle] = useState('predicted');
+  const [complaints, setComplaints] = useState([]);
+  const [predictions, setPredictions] = useState([]);
+
+  useEffect(() => {
+    complaintService.listComplaints({ limit: 200 }).then(data => {
+      const mapped = (data||[]).map(mapComplaint);
+      setComplaints(mapped);
+      // Derive hotspot predictions from ward complaint counts
+      const wardCounts = {};
+      mapped.forEach(c => { if (c.ward) wardCounts[c.ward] = (wardCounts[c.ward]||0)+1; });
+      const hotspots = Object.entries(wardCounts)
+        .sort((a,b)=>b[1]-a[1]).slice(0,5)
+        .map(([ward, count], i) => ({ rank: i+1, ward, category: 'Infrastructure', volume: count, confidence: Math.min(95, 60+count*3) }));
+      setPredictions(hotspots);
+    }).catch(console.error);
+  }, []);
 
   const handleSuggestion = (id, val) => {
     setSuggestions(prev => prev.map(s => s.id === id ? { ...s, accepted: val } : s));
@@ -57,7 +74,7 @@ export default function AdminPredictions() {
             </div>
           </div>
           <div style={{ position: 'relative' }}>
-            <MapComponent complaints={COMPLAINTS} height={400} />
+            <MapComponent complaints={complaints} height={400} />
             {/* Prediction overlay */}
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -86,10 +103,10 @@ export default function AdminPredictions() {
           <div className="card">
             <div className="card-header"><h3 className="card-title" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Flame size={20} color="var(--color-danger)" /> Top Predicted Hotspots</h3></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {PREDICTIONS.map((p, i) => (
+              {predictions.map((p, i) => (
                 <div key={p.rank} style={{
                   display: 'flex', gap: 12, padding: '12px 16px',
-                  borderBottom: i < PREDICTIONS.length - 1 ? '1px solid var(--color-neutral-100)' : 'none',
+                  borderBottom: i < predictions.length - 1 ? '1px solid var(--color-neutral-100)' : 'none',
                 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: '50%', flexShrink: 0,

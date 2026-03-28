@@ -1,8 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import ToastContainer from './components/ToastContainer';
-import Sidebar from './components/Sidebar';
-import TopBar from './components/TopBar';
+import NavBar from './components/NavBar';
 
 // Auth
 import LandingPage from './pages/LandingPage';
@@ -33,34 +32,30 @@ import DeptAnalytics from './pages/department/DeptAnalytics';
 import DeptPredictions from './pages/department/DeptPredictions';
 
 const PAGE_TITLES = {
-  '/citizen/home': 'Home',
+  '/citizen/home': 'Citizen Home',
   '/citizen/submit': 'Submit Complaint',
-  '/citizen/submit/success': 'Submitted!',
-  '/citizen/map': 'Nearby Issues',
+  '/citizen/submit/success': 'Submission Complete',
+  '/citizen/map': 'Nearby Map',
   '/citizen/heatmap': 'Heatmap',
   '/citizen/tracking': 'My Complaints',
-  '/citizen/profile': 'My Profile',
-  '/admin/dashboard': 'Dashboard',
+  '/citizen/profile': 'Profile',
+  '/admin/dashboard': 'Admin Dashboard',
   '/admin/issues': 'Issue Management',
   '/admin/live-map': 'Live Map',
   '/admin/analytics': 'Analytics',
   '/admin/predictions': 'Predictions',
-  '/department/dashboard': 'Dashboard',
+  '/department/dashboard': 'Department Dashboard',
   '/department/issues': 'Issue List',
   '/department/live': 'Live Updates',
   '/department/analytics': 'Analytics',
   '/department/predictions': 'Hotspot Prediction',
 };
 
-function AppShell({ children, title }) {
-  const { sidebarCollapsed } = useApp();
+function AppShell({ children }) {
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className={`main-content ${sidebarCollapsed ? 'collapsed' : ''}`}>
-        <TopBar title={title} />
-        <main className="page-body">{children}</main>
-      </div>
+    <div className="app-shell-v2">
+      <NavBar />
+      <main className="page-body-v2">{children}</main>
     </div>
   );
 }

@@ -149,9 +149,17 @@ class MultiTaskLoss(nn.Module):
         """
         losses = {}
 
-        losses["primary_domain"] = self.ce_loss(
-            predictions["domain_logits"], targets["domain_label"]
+        # ── Domain is Multi-Label (BCE) ──
+        # Convert single true label to one-hot for BCE loss
+        num_domains = predictions["domain_logits"].shape[-1]
+        domain_targets = torch.nn.functional.one_hot(
+            targets["domain_label"], num_classes=num_domains
+        ).float()
+        
+        losses["primary_domain"] = self.bce_loss(
+            predictions["domain_logits"], domain_targets
         )
+
         losses["sub_domain"] = self.ce_loss(
             predictions["subdomain_logits"], targets["subdomain_label"]
         )

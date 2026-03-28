@@ -48,6 +48,7 @@ async def submit_complaint(
     language: Annotated[str, Form()] = "en",
     submission_channel: Annotated[str, Form()] = "Web App",
     is_anonymous: Annotated[bool, Form()] = True,
+    user_id: Annotated[str | None, Form()] = None,
     photo: Annotated[UploadFile | None, File()] = None,
 ):
     """
@@ -63,15 +64,23 @@ async def submit_complaint(
         "language": language,
         "submission_channel": submission_channel,
         "is_anonymous": is_anonymous,
+        "user_id": user_id,
         "community_upvotes": 0,
         "llm_provider": os.getenv("LLM_PROVIDER", "gemini"),
     }
 
     # Handle photo upload (save reference — full processing is future work)
     if photo:
+        import shutil
+        upload_dir = os.path.join(os.getcwd(), "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        photo_path = os.path.join(upload_dir, f"{report_id}_{photo.filename}")
+        with open(photo_path, "wb") as buffer:
+            shutil.copyfileobj(photo.file, buffer)
+            
         request_data["has_photo"] = True
         request_data["photo_filename"] = photo.filename
-        # TODO Phase 2: Store photo in cloud storage and pass URL to perception agent
+        request_data["photo_local_path"] = photo_path
 
     # Run the LangGraph pipeline
     try:
@@ -83,8 +92,12 @@ async def submit_complaint(
 
     needs_review = final_state.get("needs_human_review", False)
     has_error = final_state.get("error") is not None
+    rules_triggered = final_state.get("rules_triggered", [])
 
-    if needs_review or has_error:
+    if "RULE_CLIP_IMAGE_MISMATCH" in rules_triggered:
+        status = ComplaintStatus.HUMAN_REVIEW
+        message = "Your complaint requires manual review as the uploaded image does not appear to match the described issue."
+    elif needs_review or has_error:
         status = ComplaintStatus.HUMAN_REVIEW
         message = "Your complaint requires manual review due to classification uncertainty."
     else:
@@ -125,7 +138,7 @@ async def list_complaints(
     status: Annotated[str | None, Query()] = None,
     department: Annotated[str | None, Query()] = None,
     priority_class: Annotated[str | None, Query()] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    limit: Annotated[int, Query(ge=1, le=500)] = 50,
     skip: Annotated[int, Query(ge=0)] = 0,
 ) -> list[dict]:
     """

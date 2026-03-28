@@ -27,59 +27,33 @@ from app.agents.local_perception_engine import predict_local
 
 # ─── Valid Taxonomy Slugs + Canonical Labels for Fuzzy Mapping ────────────────
 
-# Maps label (used for fuzzy matching) → official slug
 _SLUG_LABELS: dict[str, str] = {
     # Domain 1 — Core Infrastructure & Public Works
-    "pothole in road": "pothole",
-    "road collapse": "road_collapse",
-    "road blockage obstruction": "road_blockage",
-    "pipe leak water leak": "pipe_leak",
-    "no water supply": "no_water",
-    "contaminated water dirty water": "contaminated_water",
-    "drainage overflow flooding sewage overflow": "overflow",
-    "drain blockage pipe blockage": "blockage",
-    "sewer collapse": "sewer_collapse",
-    "broken street light": "broken_light",
-    "no lighting dark street": "no_lighting",
+    "pothole in road collapse blockage": "road_damage",
+    "pipe leak water no supply contaminated": "water_supply_failure",
+    "drainage overflow sewer manhole": "drainage_sewage",
+    "broken street light no lighting": "street_lighting_failure",
     # Domain 2 — Sanitation, Environment & Parks
-    "garbage overflow bin overflow": "overflow",          # shared slug — domain disambiguates
-    "open dumping illegal dumping": "open_dumping",
-    "no garbage collection waste not collected": "no_collection",
-    "open sewage manhole": "open_sewage",
-    "manhole overflow": "manhole_overflow",
-    "noise pollution": "noise_pollution",
-    "air pollution smoke": "air_pollution",
-    "bad odor smell": "odor",
-    "mosquito breeding stagnant water": "mosquito_breeding",
-    "rodent infestation rats": "rodent_infestation",
-    "broken playground equipment": "broken_playground",
-    "park poor maintenance neglected": "poor_maintenance",
+    "garbage overflow open dumping no collection": "waste_management",
+    "mosquito breeding rats rodent pest": "vector_pest_control",
+    "noise air pollution smoke odor": "environmental_pollution",
     # Domain 3 — Transportation & Traffic
-    "traffic signal malfunction broken signal": "malfunction",
-    "traffic light blinking": "blinking",
-    "traffic signal failed not working": "failed",
-    "illegal parking": "illegal_parking",
-    "abandoned vehicle": "abandoned_vehicle",
-    "bus stop damaged": "bus_stop_damage",
-    "metro issue": "metro_issue",
-    "missing zebra crossing pedestrian crossing": "missing_zebra_crossing",
+    "traffic signal malfunction broken blinking": "traffic_signal_fault",
+    "illegal parking abandoned vehicle": "parking_violation",
+    "missing zebra crossing pedestrian": "pedestrian_safety",
+    "public transport disruption metro": "public_transport_failure",
     # Domain 4 — Urban Planning & Real Estate
-    "illegal building construction": "illegal_building",
-    "encroachment land grab": "encroachment",
-    "land use violation zoning": "land_use_violation",
-    "unsafe structure building collapse risk": "unsafe_structure",
+    "illegal building construction": "illegal_construction",
+    "encroachment land use violation": "encroachment",
+    "unsafe structure building demolition": "unsafe_structure",
     # Domain 5 — Social Infrastructure & Public Health
-    "food safety unhygienic food": "food_safety_risk_flag",
-    "anganwadi issue childcare welfare": "anganwadi_issue",
-    "hospital service failure poor service": "hospital_service_failure",
-    "school maintenance building": "school_maintenance",
+    "food safety anganwadi hospital service": "public_health_service",
+    "school maintenance infrastructure": "school_infrastructure",
     # Domain 6 — Emergency, Safety & Accountability
-    "structural hazard danger": "structural_hazard",
-    "fire risk fire hazard": "fire_risk",
-    "flooding flood emergency": "flooding",
-    "building collapse": "collapse",
-    "bribery corruption demand for bribe": "bribery",
-    "negligence official negligence": "negligence",
+    "flooding flood emergency waterlogging": "flooding",
+    "fire risk electrical hazard danger": "electrical_hazard",
+    "building collapse structural risk danger": "structural_collapse_risk",
+    "bribery negligence official corruption": "civic_corruption",
 }
 
 _VALID_SLUGS = set(_SLUG_LABELS.values())
@@ -96,11 +70,11 @@ _DOMAINS = [
 
 _DOMAIN_SUBDOMAINS = {
     "Core Infrastructure & Public Works": ["Roads", "Water Supply", "Drainage/Sewerage", "Street Lighting"],
-    "Sanitation, Environment & Parks": ["Garbage", "Sewage", "Environment", "Vector Control", "Parks"],
-    "Transportation & Traffic": ["Traffic Signals", "Parking", "Public Transport", "Pedestrian Safety"],
+    "Sanitation, Environment & Parks": ["Garbage & Waste", "Vector Control", "Environment"],
+    "Transportation & Traffic": ["Traffic Signals", "Parking", "Pedestrian Safety", "Public Transport"],
     "Urban Planning & Real Estate": ["Construction", "Zoning", "Demolition"],
-    "Social Infrastructure & Public Health": ["Food Safety", "Child Welfare", "Healthcare", "Schools"],
-    "Emergency, Safety & Accountability": ["Safety", "Emergency", "Corruption"],
+    "Social Infrastructure & Public Health": ["Healthcare & Welfare", "Schools"],
+    "Emergency, Safety & Accountability": ["Disaster Management", "Fire & Safety", "Corruption", "Structural Safety"],
 }
 
 
@@ -206,16 +180,15 @@ def _fuzzy_map_issue_type(candidate: str, domain: str) -> tuple[str, float]:
         slug = _SLUG_LABELS[label]
         return slug, float(score)
 
-    # No match — return domain-level default
     domain_defaults = {
-        "Core Infrastructure & Public Works": "pothole",
-        "Sanitation, Environment & Parks": "open_dumping",
-        "Transportation & Traffic": "malfunction",
-        "Urban Planning & Real Estate": "encroachment",
-        "Social Infrastructure & Public Health": "food_safety_risk_flag",
-        "Emergency, Safety & Accountability": "structural_hazard",
+        "Core Infrastructure & Public Works": "road_damage",
+        "Sanitation, Environment & Parks": "waste_management",
+        "Transportation & Traffic": "traffic_signal_fault",
+        "Urban Planning & Real Estate": "illegal_construction",
+        "Social Infrastructure & Public Health": "public_health_service",
+        "Emergency, Safety & Accountability": "structural_collapse_risk",
     }
-    return domain_defaults.get(domain, "pothole"), 0.0
+    return domain_defaults.get(domain, "road_damage"), 0.0
 
 
 # ─── Governance Fence ─────────────────────────────────────────────────────────
@@ -347,8 +320,12 @@ async def run_perception_agent(
     perception = PerceptionOutput(**data)
 
     # Human review if confidence low OR fuzzy mapping uncertain
-    # Note: local model is considered confident if correctly loaded
-    needs_human_review = perception.confidence < 0.70 or match_score < 55
+    # Softmax probabilities over 44 classes naturally dilute, so >0.40 is highly confident for local engine.
+    if provider == "local":
+        needs_human_review = perception.confidence < 0.40 or match_score < 55
+    else:
+        needs_human_review = perception.confidence < 0.70 or match_score < 55
+        
     return perception, needs_human_review
 
 

@@ -117,11 +117,26 @@ async def run_routing_agent(
         )
 
     # ── Rule 5: Dynamic SLA adjustment based on historical breaches ───────
-    from app.db.mongodb import department_metrics_col
+    from app.db.mongodb import department_metrics_col, complaints_col
     dept_metrics = await department_metrics_col().find_one({"department_id": department})
     if dept_metrics:
         compliance_rate = dept_metrics.get("sla_compliance_rate", 1.0)
-        if compliance_rate < 0.80:
+        
+        # Calculate LIVE open tickets for this department
+        open_tickets = await complaints_col().count_documents({
+            "governance_and_sla.assigned_department": department,
+            "common_metadata.status": {"$in": ["Pending", "In Process", "Assigned", "In Progress"]}
+        })
+        
+        # ── Context Engine: Departmental Fluidity ─────────────────────────
+        if compliance_rate < 0.50 and open_tickets > 200 and priority_class == PriorityClass.LOW:
+            old_dept = department
+            department = "Overflow / General Municipal"
+            rules_triggered.append("RULE_DEPARTMENTAL_OVERLOAD_REROUTE")
+            explanation_parts.append(
+                f"Dept '{old_dept}' overload (compliance <50%, active tickets={open_tickets}) → Re-routed LOW priority issue to Overflow queue."
+            )
+        elif compliance_rate < 0.80:
             # Department is struggling -> tighten SLA by 25% to force faster escalation
             sla_hours = int(sla_hours * 0.75)
             rules_triggered.append("RULE_DYNAMIC_SLA_TIGHTENING")

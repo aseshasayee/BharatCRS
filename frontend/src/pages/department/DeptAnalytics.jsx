@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { CHART_SLA, CHART_DEPT_SLA } from '../../data/mockData';
+import { statsService } from '../../services/statsService';
 import { Download, Clock, Package, TrendingUp, CheckCircle2, FolderOpen } from 'lucide-react';
 
 const AVG_RESOLUTION = [
@@ -35,13 +35,34 @@ function ChartCard({ title, children }) {
 
 export default function DeptAnalytics() {
   const [dateRange, setDateRange] = useState('30d');
+  const [slaData, setSlaData] = useState([
+    { name: 'On Time', value: 72, fill: '#22c55e' },
+    { name: 'SLA Breach', value: 28, fill: '#ef4444' },
+  ]);
+
+  useEffect(() => {
+    statsService.getDepartmentMetrics?.().then(data => {
+      if (!data?.length) return;
+      const total = data.reduce((s, d) => s + (d.total_complaints || 0), 0);
+      const onTime = data.reduce((s, d) => s + (d.resolved_on_time || 0), 0);
+      if (total > 0) {
+        const pct = Math.round((onTime / total) * 100);
+        setSlaData([
+          { name: 'On Time', value: pct, fill: '#22c55e' },
+          { name: 'SLA Breach', value: 100 - pct, fill: '#ef4444' },
+        ]);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const CHART_SLA = slaData;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h2 style={{ fontFamily: 'Poppins', fontSize: 24, fontWeight: 700 }}>Performance Analytics</h2>
-          <p style={{ color: 'var(--color-neutral-600)', fontSize: 14, marginTop: 4 }}>Public Works Department · Bengaluru</p>
+          <p style={{ color: 'var(--color-neutral-600)', fontSize: 14, marginTop: 4 }}>Public Works Department · Chennai</p>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           {['7d','30d','90d'].map(r => (

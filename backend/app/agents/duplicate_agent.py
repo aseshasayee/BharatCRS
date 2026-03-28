@@ -67,6 +67,7 @@ async def run_duplicate_agent(
             "duplicate_report_count": int,
             "is_duplicate": bool,
             "master_complaint_id": str | None,
+            "is_cascading_failure": bool,
         }
     """
     # Define the 48-hour lookback window
@@ -90,6 +91,22 @@ async def run_duplicate_agent(
 
         if distance <= CLUSTER_RADIUS_METERS:
             nearby_complaints.append(complaint)
+            
+    # ── Cascading Failure Check (Different issues tightly clustered) ──────────
+    
+    cascading_query = {
+        "domain_classification.issue_type": {"$ne": issue_type},
+        "common_metadata.submission_timestamp": {"$gte": time_cutoff},
+        "common_metadata.status": {"$nin": ["Resolved", "Rejected"]},
+    }
+    
+    is_cascading_failure = False
+    async for comp in complaints_col().find(cascading_query):
+        comp_lat = comp["spatio_temporal_core"]["location"]["latitude"]
+        comp_lon = comp["spatio_temporal_core"]["location"]["longitude"]
+        if haversine_meters(latitude, longitude, comp_lat, comp_lon) <= CLUSTER_RADIUS_METERS:
+            is_cascading_failure = True
+            break
 
     if not nearby_complaints:
         # No duplicates found — this is a unique complaint
@@ -98,6 +115,7 @@ async def run_duplicate_agent(
             "duplicate_report_count": 0,
             "is_duplicate": False,
             "master_complaint_id": None,
+            "is_cascading_failure": is_cascading_failure,
         }
 
     # ── Duplicates found: find or create a cluster ──────────────────────────
@@ -147,6 +165,7 @@ async def run_duplicate_agent(
         "duplicate_report_count": duplicate_count,
         "is_duplicate": True,
         "master_complaint_id": master_complaint_id,
+        "is_cascading_failure": is_cascading_failure,
     }
 
 

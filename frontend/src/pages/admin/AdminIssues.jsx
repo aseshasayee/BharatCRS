@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { COMPLAINTS, CATEGORIES, DEPARTMENTS, WARDS, formatDateTime, getCategoryById } from '../../data/mockData';
+import { useState, useEffect } from 'react';
+import { mapComplaint, DEPARTMENTS, CHENNAI_WARDS, DOMAIN_EMOJIS } from '../../utils/helpers';
+const DOMAINS = Object.keys(DOMAIN_EMOJIS);
 import { StatusBadge, PriorityBadge, CategoryChip, ConfirmDialog } from '../../components/SharedComponents';
 import { useApp } from '../../context/AppContext';
+import { complaintService } from '../../services/complaintService';
 import { Search, Filter, Download, X, Eye, UserCheck, AlertTriangle, MapPin } from 'lucide-react';
-import MapComponent from '../../components/MapComponent';
 
 export default function AdminIssues() {
   const { addToast } = useApp();
@@ -14,21 +15,64 @@ export default function AdminIssues() {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [bulkDept, setBulkDept] = useState('');
 
-  const filtered = COMPLAINTS.filter(c =>
-    (!search || c.id.includes(search) || c.title.toLowerCase().includes(search.toLowerCase()) || c.location.toLowerCase().includes(search.toLowerCase())) &&
-    (!filters.priority || c.priority === filters.priority) &&
-    (!filters.status || c.status === filters.status) &&
-    (!filters.category || c.category === filters.category) &&
-    (!filters.ward || c.ward === filters.ward)
-  );
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadIssues = async () => {
+    setLoading(true);
+    try {
+      const data = await complaintService.listComplaints({ limit: 100 });
+      setComplaints(data || []);
+    } catch (err) {
+      addToast('Failed to load issues', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadIssues(); }, []);
+
+  const filtered = complaints.filter(c => {
+    const status = c.common_metadata?.status || '';
+    const reportId = c.common_metadata?.report_id || '';
+    const priority = c.priority_assessment?.priority_class || '';
+    const primaryDomain = c.domain_classification?.primary_domain || '';
+    // map category ID to name for local filtering if needed
+    
+    return (!search || reportId.toLowerCase().includes(search.toLowerCase())) &&
+      (!filters.priority || priority.toLowerCase() === filters.priority.toLowerCase()) &&
+      (!filters.status || status.toLowerCase() === filters.status.toLowerCase());
+  });
 
   const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const toggleAll = () => setSelected(prev => prev.length === filtered.length ? [] : filtered.map(c => c.id));
+  const toggleAll = () => setSelected(prev => prev.length === filtered.length ? [] : filtered.map(c => c.common_metadata?.report_id));
 
-  const handleBulkAssign = () => {
+  const handleBulkAssign = async () => {
     if (!bulkDept) { addToast('Select a department first', 'warning'); return; }
-    addToast(`${selected.length} complaints assigned to ${bulkDept}`, 'success');
-    setSelected([]);
+    try {
+      for (let id of selected) {
+        await complaintService.adminOverride(id, {
+          new_department: bulkDept,
+          new_priority_class: "Medium", // Keeping default or existing
+          new_sla_hours: 48,
+          override_reason: "Bulk assignment via Admin"
+        });
+      }
+      addToast(`Assigned ${selected.length} to ${bulkDept}`, 'success');
+      setSelected([]);
+      loadIssues();
+    } catch (e) { addToast('Bulk assign partially failed', 'error'); }
+  };
+  
+  const handleBulkResolve = async () => {
+    try {
+      for (let id of selected) {
+        await complaintService.resolveComplaint(id);
+      }
+      addToast(`Resolved ${selected.length} issues`, 'success');
+      setSelected([]);
+      loadIssues();
+    } catch (e) { addToast('Bulk resolve partially failed', 'error'); }
   };
 
   return (
@@ -72,7 +116,7 @@ export default function AdminIssues() {
           </select>
           <button className="btn btn-primary btn-sm" onClick={handleBulkAssign}><UserCheck size={13} /> Assign</button>
           <button className="btn btn-danger btn-sm" onClick={() => addToast(`${selected.length} complaints escalated`, 'warning')}><AlertTriangle size={13} /> Escalate</button>
-          <button className="btn btn-success btn-sm" onClick={() => addToast(`${selected.length} complaints resolved`, 'success')}>Mark Resolved</button>
+          <button className="btn btn-success btn-sm" onClick={handleBulkResolve}>Mark Resolved</button>
           <button className="btn btn-secondary btn-sm" onClick={() => setSelected([])}><X size={13} /></button>
         </div>
       )}
@@ -93,21 +137,34 @@ export default function AdminIssues() {
                 <th>Issue ID</th><th>Category</th><th>Priority</th><th>Location</th><th>Submitted</th><th>Status</th><th>Assigned To</th><th>Actions</th>
               </tr>
             </thead>
+            {loading ? (
+              <tbody><tr><td colSpan="9" style={{ textAlign: 'center', padding: 20 }}>Loading...</td></tr></tbody>
+            ) : (
             <tbody>
-              {filtered.map(c => (
-                <tr key={c.id} className={c.priority === 'high' ? 'high-priority' : ''}>
-                  <td><input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleSelect(c.id)} /></td>
+              {filtered.map(c => {
+                 const id = c.common_metadata?.report_id;
+                 const status = c.common_metadata?.status?.toLowerCase() || 'submitted';
+                 const priority = c.priority_assessment?.priority_class?.toLowerCase() || 'low';
+                 const title = c.common_metadata?.raw_text || 'No description';
+                 const category = c.domain_classification?.primary_domain || 'Unknown';
+                 const ward = `Ward ${c.spatio_temporal_core?.administrative_unit?.ward_id || '?'}`;
+                 const assignedDept = c.governance_and_sla?.assigned_department;
+                 const submittedAt = new Date(c.common_metadata?.submission_timestamp).toLocaleDateString();
+                 
+                 return(
+                <tr key={id} className={priority === 'high' || priority === 'critical' ? 'high-priority' : ''}>
+                  <td><input type="checkbox" checked={selected.includes(id)} onChange={() => toggleSelect(id)} /></td>
                   <td>
                     <button onClick={() => setModal({ complaint: c, type: 'view' })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>
-                      {c.id}
+                      {id}
                     </button>
                   </td>
-                  <td><CategoryChip category={c.category} /></td>
-                  <td><PriorityBadge priority={c.priority} /></td>
-                  <td style={{ fontSize: 13 }}>{c.ward}</td>
-                  <td style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{formatDateTime(c.submittedAt)}</td>
-                  <td><StatusBadge status={c.status} /></td>
-                  <td style={{ fontSize: 13 }}>{c.assignedDept || <span style={{ color: 'var(--color-neutral-400)' }}>Unassigned</span>}</td>
+                  <td><CategoryChip category={category} /></td>
+                  <td><PriorityBadge priority={priority} /></td>
+                  <td style={{ fontSize: 13 }}>{ward}</td>
+                  <td style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{submittedAt}</td>
+                  <td><StatusBadge status={status} /></td>
+                  <td style={{ fontSize: 13 }}>{assignedDept || <span style={{ color: 'var(--color-neutral-400)' }}>Unassigned</span>}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-sm btn-secondary" onClick={() => setModal({ complaint: c, type: 'view' })} style={{ padding: '4px 8px' }}>
@@ -116,14 +173,11 @@ export default function AdminIssues() {
                       <button className="btn btn-sm btn-primary" onClick={() => setModal({ complaint: c, type: 'assign' })} style={{ padding: '4px 8px' }}>
                         <UserCheck size={13} />
                       </button>
-                      <button className="btn btn-sm btn-danger" onClick={() => addToast(`${c.id} escalated`, 'warning')} style={{ padding: '4px 8px' }}>
-                        <AlertTriangle size={13} />
-                      </button>
                     </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              )})}
+            </tbody>)}
           </table>
         </div>
         {/* Pagination */}
@@ -142,33 +196,46 @@ export default function AdminIssues() {
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal" style={{ maxWidth: 680 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <span className="modal-title">{modal.complaint.id} — {modal.type === 'assign' ? 'Assign Issue' : 'Issue Details'}</span>
+              <span className="modal-title">{modal.complaint.common_metadata?.report_id} — {modal.type === 'assign' ? 'Assign Issue' : 'Issue Details'}</span>
               <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-neutral-600)' }}><X size={18} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <StatusBadge status={modal.complaint.status} />
-                <PriorityBadge priority={modal.complaint.priority} />
-                <CategoryChip category={modal.complaint.category} />
+                <StatusBadge status={modal.complaint.common_metadata?.status || 'submitted'} />
+                <PriorityBadge priority={modal.complaint.priority_assessment?.priority_class || 'low'} />
+                <CategoryChip category={modal.complaint.domain_classification?.primary_domain} />
               </div>
-              <h3 style={{ fontFamily: 'Poppins', fontWeight: 600, fontSize: 16 }}>{modal.complaint.title}</h3>
-              <p style={{ fontSize: 14, color: 'var(--color-neutral-700)' }}>{modal.complaint.description}</p>
-              <p style={{ fontSize: 13, color: 'var(--color-neutral-600)', display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={13} /> {modal.complaint.location}</p>
-              <MapComponent complaints={[modal.complaint]} height={180} center={[modal.complaint.lat, modal.complaint.lng]} zoom={15} />
+              <p style={{ fontSize: 14, color: 'var(--color-neutral-700)', padding: 12, background: '#f5f5f5', borderRadius: 8 }}>{modal.complaint.common_metadata?.raw_text}</p>
+              
               {modal.type === 'assign' && (
                 <div className="form-group">
                   <label className="form-label">Assign to Department</label>
-                  <select className="form-select">
+                  <select className="form-select" id="modal-dept-select">
                     <option value="">Select department...</option>
-                    {DEPARTMENTS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    {DEPARTMENTS.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                   </select>
                 </div>
               )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={() => { addToast('Action completed', 'success'); setModal(null); }}>
-                {modal.type === 'assign' ? 'Assign' : 'Done'}
+              <button className="btn btn-primary" onClick={async () => { 
+                if (modal.type === 'assign') {
+                  const dept = document.getElementById('modal-dept-select').value;
+                  if(dept) {
+                     await complaintService.adminOverride(modal.complaint.common_metadata?.report_id, {
+                        new_department: dept,
+                        new_priority_class: modal.complaint.priority_assessment?.priority_class || 'Medium',
+                        new_sla_hours: 48,
+                        override_reason: 'Admin Dashboard Modal Assignment'
+                     });
+                     addToast('Assigned successfully', 'success');
+                     loadIssues();
+                  }
+                }
+                setModal(null); 
+              }}>
+                {modal.type === 'assign' ? 'Assign' : 'Close'}
               </button>
             </div>
           </div>

@@ -62,7 +62,11 @@ export default function Sidebar() {
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
         {/* Logo */}
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">B</div>
+          <img
+            src="/logo.svg"
+            alt="BharatCRS logo"
+            className="sidebar-logo-icon"
+          />
           {!collapsed && (
             <div>
               <div className="sidebar-logo-text">BharatCRS</div>

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Bell, Menu, X, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { NOTIFICATIONS } from '../data/mockData';
 
 export default function TopBar({ title }) {
   const { setMobileSidebarOpen, mobileSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useApp();

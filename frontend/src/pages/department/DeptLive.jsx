@@ -1,15 +1,9 @@
 import { useState, useEffect } from 'react';
-import { COMPLAINTS, timeAgo } from '../../data/mockData';
+import { complaintService } from '../../services/complaintService';
+import { mapComplaint, timeAgo } from '../../utils/helpers';
 import { PriorityBadge, CategoryChip } from '../../components/SharedComponents';
 import { useApp } from '../../context/AppContext';
 import { Pause, Play, Filter, Volume2, VolumeX, Circle, MapPin, User, Clock } from 'lucide-react';
-
-const LIVE_STREAM = [
-  { id: 'BHR-2024-NEW-1', title: 'Broken water pipe flooding street', category: 'water', priority: 'high', ward: 'Ward 3 - Whitefield', time: new Date(), citizenName: 'Anitha Rao' },
-  { id: 'BHR-2024-NEW-2', title: 'Power outage residential area', category: 'electricity', priority: 'medium', ward: 'Ward 2 - Indiranagar', time: new Date(Date.now() - 180000), citizenName: 'Ramesh S.' },
-  { id: 'BHR-2024-NEW-3', title: 'Road cave-in near school', category: 'road', priority: 'high', ward: 'Ward 7 - Marathahalli', time: new Date(Date.now() - 3600000), citizenName: 'Priya Sharma' },
-  { id: 'BHR-2024-NEW-4', title: 'Garbage overflow on main road', category: 'sanitation', priority: 'medium', ward: 'Ward 5 - Rajajinagar', time: new Date(Date.now() - 7200000), citizenName: 'Vikram B.' },
-];
 
 export default function DeptLive() {
   const { addToast } = useApp();
@@ -17,30 +11,33 @@ export default function DeptLive() {
   const [sound, setSound] = useState(false);
   const [filterHigh, setFilterHigh] = useState(false);
   const [timeWindow, setTimeWindow] = useState('live');
-  const [issues, setIssues] = useState(LIVE_STREAM);
+  const [issues, setIssues] = useState([]);
   const [newCount, setNewCount] = useState(0);
 
-  // Simulate new incoming issues
+  const fetchIssues = () => {
+    complaintService.listComplaints({ limit: 30 })
+      .then(data => setIssues((data || []).map(mapComplaint)))
+      .catch(console.error);
+  };
+
+
+  // Fetch initial issues from API, then poll every 30s for new ones
   useEffect(() => {
+    fetchIssues();
     if (paused) return;
     const timer = setInterval(() => {
-      const fake = {
-        id: `BHR-2024-AUTO-${Math.floor(Math.random() * 9000)}`,
-        title: ['Pothole blocking traffic', 'No electricity for 2 hours', 'Water leakage', 'Garbage not collected'][Math.floor(Math.random() * 4)],
-        category: ['road', 'electricity', 'water', 'sanitation'][Math.floor(Math.random() * 4)],
-        priority: Math.random() > 0.6 ? 'high' : 'medium',
-        ward: `Ward ${Math.floor(Math.random() * 12) + 1}`,
-        time: new Date(),
-        citizenName: 'Citizen',
-      };
-      setIssues(prev => [fake, ...prev].slice(0, 20));
-      setNewCount(n => n + 1);
-      if (fake.priority === 'high') addToast(`🚨 High priority issue in ${fake.ward}`, 'error');
-    }, 12000);
+      complaintService.listComplaints({ limit: 30 })
+        .then(data => {
+          const fresh = (data || []).map(mapComplaint);
+          setIssues(fresh);
+          const newOnes = fresh.filter(c => c.priority === 'Critical' || c.priority === 'High');
+          if (newOnes.length > 0) setNewCount(n => n + newOnes.length);
+        }).catch(() => {});
+    }, 30000);
     return () => clearInterval(timer);
   }, [paused]);
 
-  const displayed = (filterHigh ? issues.filter(i => i.priority === 'high') : issues);
+  const displayed = (filterHigh ? issues.filter(i => i.priority === 'Critical' || i.priority === 'High') : issues);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -92,7 +89,7 @@ export default function DeptLive() {
           <div key={issue.id}
             className="card"
             style={{
-              borderLeft: issue.priority === 'high' ? '4px solid var(--color-danger)' : '4px solid var(--color-warning)',
+              borderLeft: (issue.priority === 'High' || issue.priority === 'Critical') ? '4px solid var(--color-danger)' : '4px solid var(--color-warning)',
               animation: i === 0 ? 'slideDown 0.3s ease' : 'none',
             }}>
             <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>

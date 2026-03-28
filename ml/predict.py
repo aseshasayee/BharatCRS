@@ -45,7 +45,16 @@ def predict(text, city="Chennai", ward=94, channel="Mobile App"):
         outputs = model(inputs["input_ids"], inputs["attention_mask"])
 
     # 5. Decode Results
-    domain = DOMAIN_I2L[outputs["domain_logits"].argmax().item()]
+    # Domain is multi-label (sigmoid), let's print top 2 or those above threshold
+    domain_probs = torch.sigmoid(outputs["domain_logits"][0]).cpu().numpy()
+    domain_indices = domain_probs.argsort()[::-1]
+    
+    # Let's collect domains that have prob > 0.3 or at least the top 1
+    predicted_domains = []
+    for idx in domain_indices:
+        if domain_probs[idx] > 0.3 or len(predicted_domains) == 0:
+            predicted_domains.append((DOMAIN_I2L[idx], domain_probs[idx]))
+
     subdomain = SUBDOMAIN_I2L[outputs["subdomain_logits"].argmax().item()]
     issue = ISSUE_I2L[outputs["issue_logits"].argmax().item()]
     
@@ -60,7 +69,10 @@ def predict(text, city="Chennai", ward=94, channel="Mobile App"):
     print("═" * 40)
     print(f"  CLASSIFICATION RESULTS")
     print("═" * 40)
-    print(f"  Primary Domain:  {domain}")
+    
+    domain_str = ", ".join([f"{d} ({p*100:.1f}%)" for d, p in predicted_domains])
+    print(f"  Primary Domains: {domain_str}")
+    
     print(f"  Sub-Domain:      {subdomain}")
     print(f"  Issue Type:      {issue}")
     print(f"  Severity (1-10): {severity:.1f}")

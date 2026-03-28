@@ -106,6 +106,12 @@ class ContextDerivedIndicators(BaseModel):
     road_importance_score: int | None = Field(default=None, ge=1, le=5)
     # Factual proximity (from Context Agent)
     near_sensitive_institution_flag: bool = False
+    active_event_proximity: bool = False
+    
+    # Real-world dynamic context
+    weather_condition: str | None = None
+    temporal_context: str | None = None
+    
     # Policy judgment (routing agent applies SLA rules on this)
     vulnerable_population_flag: bool = False
     area_importance_score: float | None = Field(default=None, ge=0, le=10)
@@ -117,6 +123,7 @@ class ContextDerivedIndicators(BaseModel):
 class SystemicPatternMetrics(BaseModel):
     recurring_issue_flag: bool = False
     systemic_issue_flag: bool = False
+    cascading_failure_flag: bool = False
     hotspot_cluster_id: str | None = None
     duplicate_report_count: int = 0
 
@@ -178,6 +185,7 @@ class AgentTraceability(BaseModel):
     rules_triggered: list[str] = Field(default_factory=list)
     decision_explanation: str = ""
     manual_override_flag: bool = False
+    user_trust_score: float = 0.5
 
 
 # ─── Full BharathCRS Complaint Document ───────────────────────────────────────
@@ -220,6 +228,7 @@ class ComplaintSubmitRequest(BaseModel):
     language: Language = Language.ENGLISH
     submission_channel: SubmissionChannel = SubmissionChannel.WEB_APP
     is_anonymous: bool = True
+    user_id: str | None = None
     community_upvotes: int = 0
 
 

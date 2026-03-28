@@ -1,17 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import {
-  CHART_RESOLUTION_EFFICIENCY, CHART_DEPT_PERFORMANCE,
-  CHART_SLA, CHART_CATEGORY, CHART_COMPLAINTS_OVER_TIME,
-} from '../../data/mockData';
+import { statsService } from '../../services/statsService';
+import { complaintService } from '../../services/complaintService';
 import { Download, TrendingUp, Building, CheckCircle2, BookOpen, Map, Target } from 'lucide-react';
 
-const WARD_DATA = [
-  { ward: 'W-1', issues: 47 }, { ward: 'W-2', issues: 38 }, { ward: 'W-3', issues: 31 },
-  { ward: 'W-4', issues: 89 }, { ward: 'W-5', issues: 23 }, { ward: 'W-6', issues: 41 },
+export default function AdminAnalytics() {
+  const [dateRange, setDateRange] = useState('30d');
+  const [deptPerf, setDeptPerf] = useState([]);
+  const [slaData, setSlaData] = useState([{name:'On Time',value:72,fill:'#22c55e'},{name:'SLA Breach',value:28,fill:'#ef4444'}]);
+  const [wardData, setWardData] = useState([]);
+  const [priorityData, setPriorityData] = useState([{name:'Critical',value:0,fill:'#7c3aed'},{name:'High',value:0,fill:'#DC2626'},{name:'Medium',value:0,fill:'#D97706'},{name:'Low',value:0,fill:'#16A34A'}]);
+
+  useEffect(() => {
+    // Dept performance
+    statsService.getDepartmentMetrics?.().then(data => {
+      if (!data?.length) return;
+      const total = data.reduce((s,d) => s+(d.total_complaints||0),0);
+      const onTime = data.reduce((s,d) => s+(d.resolved_on_time||0),0);
+      if (total>0) {
+        const pct = Math.round((onTime/total)*100);
+        setSlaData([{name:'On Time',value:pct,fill:'#22c55e'},{name:'SLA Breach',value:100-pct,fill:'#ef4444'}]);
+      }
+      setDeptPerf(data.slice(0,6).map(d=>({dept:d.department_id?.split(' ')[0]||d.department_id,avgTime:(d.avg_resolution_days||2).toFixed(1)*1})));
+    }).catch(()=>{});
+    // Ward data and priority from complaints
+    complaintService.listComplaints({limit:200}).then(data => {
+      const wardCounts = {};
+      const pCounts = {Critical:0,High:0,Medium:0,Low:0};
+      (data||[]).forEach(c=>{
+        const w = c.common_metadata?.location?.ward_name;
+        if(w) wardCounts[w]=(wardCounts[w]||0)+1;
+        const p = c.priority_assessment?.priority_class;
+        if(p && pCounts[p]!==undefined) pCounts[p]++;
+      });
+      setWardData(Object.entries(wardCounts).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([ward,issues])=>({ward:ward.substring(0,8),issues})));
+      setPriorityData([{name:'Critical',value:pCounts.Critical,fill:'#7c3aed'},{name:'High',value:pCounts.High,fill:'#DC2626'},{name:'Medium',value:pCounts.Medium,fill:'#D97706'},{name:'Low',value:pCounts.Low,fill:'#16A34A'}]);
+    }).catch(()=>{});
+  },[]);
+
+const CHART_SLA = slaData;
+const WARD_DATA = wardData;
+
+const CHART_RESOLUTION_EFFICIENCY = [
+  { week: 'Week 1', efficiency: 75 },
+  { week: 'Week 2', efficiency: 80 },
+  { week: 'Week 3', efficiency: 85 },
+  { week: 'Week 4', efficiency: 90 },
 ];
 
 const STACKED = [
@@ -19,21 +56,6 @@ const STACKED = [
   { month: 'Dec', road: 150, water: 95, electricity: 75, sanitation: 110 },
   { month: 'Jan', road: 180, water: 110, electricity: 85, sanitation: 130 },
 ];
-
-function ChartCard({ title, children }) {
-  return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="card-title">{title}</h3>
-        <button className="btn btn-secondary btn-sm" style={{ gap: 4 }}><Download size={12} /> Export</button>
-      </div>
-      <div style={{ padding: '8px 16px 20px' }}>{children}</div>
-    </div>
-  );
-}
-
-export default function AdminAnalytics() {
-  const [dateRange, setDateRange] = useState('30d');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -69,7 +91,7 @@ export default function AdminAnalytics() {
 
         <ChartCard title={<span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Building size={18} /> Department Performance (avg days)</span>}>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={CHART_DEPT_PERFORMANCE} barSize={28}>
+            <BarChart data={deptPerf} barSize={28}>
               <XAxis dataKey="dept" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
@@ -129,9 +151,9 @@ export default function AdminAnalytics() {
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={[{ name: 'High', value: 284, fill: '#DC2626' }, { name: 'Medium', value: 612, fill: '#D97706' }, { name: 'Low', value: 388, fill: '#16A34A' }]}
+                <Pie data={priorityData}
                   cx="50%" cy="50%" outerRadius={80} dataKey="value" paddingAngle={2}>
-                  {[0, 1, 2].map(i => <Cell key={i} fill={['#DC2626', '#D97706', '#16A34A'][i]} />)}
+                  {priorityData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
                 <Tooltip />
                 <Legend />

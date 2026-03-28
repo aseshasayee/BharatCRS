@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { COMPLAINTS, DEPARTMENTS } from '../../data/mockData';
+import { useState, useEffect } from 'react';
+import { complaintService } from '../../services/complaintService';
+import { mapComplaint, DEPARTMENTS } from '../../utils/helpers';
 import { StatusBadge, PriorityBadge } from '../../components/SharedComponents';
 import MapComponent from '../../components/MapComponent';
 import { useApp } from '../../context/AppContext';
@@ -7,20 +8,30 @@ import { X, RefreshCw, AlertTriangle, UserCheck, MapPin, Circle } from 'lucide-r
 
 export default function AdminLiveMap() {
   const { addToast } = useApp();
+  const [allComplaints, setAllComplaints] = useState([]);
   const [selected, setSelected] = useState(null);
   const [deptFilter, setDeptFilter] = useState([]);
   const [priorityFilter, setPriorityFilter] = useState('');
-  const [viewMode, setViewMode] = useState('all'); // all | unassigned | dept
+  const [viewMode, setViewMode] = useState('all');
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  const highUnassigned = COMPLAINTS.filter(c => c.priority === 'high' && !c.assignedTo).length;
+  const fetchData = () => {
+    complaintService.listComplaints({ limit: 200 })
+      .then(data => setAllComplaints((data || []).map(mapComplaint)))
+      .catch(console.error);
+    setLastRefresh(new Date());
+  };
 
-  const filtered = COMPLAINTS.filter(c =>
+  useEffect(() => { fetchData(); }, []);
+
+  const highUnassigned = allComplaints.filter(c => (c.priority === 'High' || c.priority === 'Critical') && !c.department).length;
+
+  const filtered = allComplaints.filter(c =>
     (viewMode === 'all') ||
-    (viewMode === 'unassigned' && !c.assignedTo) ||
+    (viewMode === 'unassigned' && !c.department) ||
     (viewMode === 'dept' && deptFilter.length === 0) ||
-    (viewMode === 'dept' && deptFilter.includes(c.assignedTo))
-  ).filter(c => !priorityFilter || c.priority === priorityFilter);
+    (viewMode === 'dept' && deptFilter.includes(c.department))
+  ).filter(c => !priorityFilter || c.priority?.toLowerCase() === priorityFilter.toLowerCase());
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 130px)', margin: '-32px', overflow: 'hidden' }}>
@@ -59,10 +70,10 @@ export default function AdminLiveMap() {
           <div>
             <label className="form-label">Departments</label>
             {DEPARTMENTS.map(d => (
-              <label key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 6, fontSize: 13 }}>
-                <input type="checkbox" checked={deptFilter.includes(d.id)}
-                  onChange={() => setDeptFilter(prev => prev.includes(d.id) ? prev.filter(x => x !== d.id) : [...prev, d.id])} />
-                {d.short}
+              <label key={d} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 6, fontSize: 12 }}>
+                <input type="checkbox" checked={deptFilter.includes(d)}
+                  onChange={() => setDeptFilter(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])} />
+                {d.split(' ')[0]}
               </label>
             ))}
           </div>
@@ -81,7 +92,7 @@ export default function AdminLiveMap() {
 
         {/* Refresh */}
         <div style={{ padding: 16, borderTop: '1px solid var(--color-neutral-100)' }}>
-          <button className="btn btn-secondary btn-full btn-sm" onClick={() => { setLastRefresh(new Date()); addToast('Map refreshed', 'info'); }}>
+          <button className="btn btn-secondary btn-full btn-sm" onClick={() => { fetchData(); addToast('Map refreshed', 'info'); }}>
             <RefreshCw size={13} /> Refresh Now
           </button>
           <p style={{ fontSize: 11, color: 'var(--color-neutral-600)', marginTop: 6, textAlign: 'center' }}>

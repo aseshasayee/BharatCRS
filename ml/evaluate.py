@@ -89,6 +89,9 @@ def evaluate():
     print(f"[Eval] Loaded checkpoint from epoch {checkpoint['epoch']} (val_loss={checkpoint['val_loss']:.4f})")
 
     # ── Collect Predictions ──
+    domain_top2_correct = 0
+    domain_total = 0
+
     all_preds = {
         "domain": [], "subdomain": [], "issue": [],
         "safety": [], "vulnerable": [],
@@ -106,6 +109,11 @@ def evaluate():
             attention_mask = batch["attention_mask"].to(DEVICE)
 
             preds = model(input_ids, attention_mask)
+
+            # Top-2 logic for primary domain
+            top2_domain_indices = preds["domain_logits"].topk(2, dim=1).indices
+            domain_top2_correct += (top2_domain_indices == batch["domain_label"].to(DEVICE).unsqueeze(1)).any(dim=1).sum().item()
+            domain_total += len(batch["domain_label"])
 
             all_preds["domain"].extend(preds["domain_logits"].argmax(dim=1).cpu().tolist())
             all_preds["subdomain"].extend(preds["subdomain_logits"].argmax(dim=1).cpu().tolist())
@@ -128,6 +136,7 @@ def evaluate():
     print(f"\n{'─' * 60}")
     print("  PRIMARY DOMAIN Classification Report")
     print(f"{'─' * 60}")
+    print(f"Top-2 Domain Accuracy: {domain_top2_correct / max(domain_total, 1):.4f}\n")
     domain_report = classification_report(
         all_targets["domain"], all_preds["domain"],
         target_names=PRIMARY_DOMAIN_LABELS,

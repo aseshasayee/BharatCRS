@@ -9,37 +9,15 @@ from transformers import AutoTokenizer
 MODEL_NAME = "ai4bharat/IndicBERTv2-MLM-only"
 MAX_SEQ_LENGTH = 256
 
-PRIMARY_DOMAIN_LABELS = [
-    "Core Infrastructure & Public Works",
-    "Emergency, Safety & Accountability",
-    "Sanitation, Environment & Parks",
-    "Social Infrastructure & Public Health",
-    "Transportation & Traffic",
-    "Urban Planning & Real Estate",
-]
-
-SUB_DOMAIN_LABELS = [
-    "Construction", "Corruption", "Drainage/Sewerage", "Emergency", "Environment",
-    "Food Safety", "Garbage", "Healthcare", "Parking", "Pedestrian Safety",
-    "Public Transport", "Roads", "Schools", "Street Lighting", "Traffic Signals",
-    "Vector Control", "Water Supply", "Zoning",
-]
-
-ISSUE_TYPE_LABELS = [
-    "abandoned_vehicle", "air_pollution", "anganwadi_issue", "blockage", "bribery",
-    "contaminated_water", "encroachment", "fire_risk", "flooding", "food_safety_risk_flag",
-    "hospital_service_failure", "illegal_building", "illegal_parking", "land_use_violation",
-    "manhole_overflow", "missing_zebra_crossing", "mosquito_breeding", "negligence",
-    "no_collection", "no_lighting", "no_water", "noise_pollution", "open_dumping",
-    "overflow", "pipe_leak", "pothole", "road_blockage", "road_collapse",
-    "rodent_infestation", "school_maintenance", "sewer_collapse", "signal_malfunction",
-    "transport_disruption", "unsafe_structure",
-]
-
 # ─── Singleton Loader ────────────────────────────────────────────────────────
 
 _ORT_SESSION = None
 _TOKENIZER = None
+_LABELS = {
+    "PRIMARY_DOMAIN_LABELS": [],
+    "SUB_DOMAIN_LABELS": [],
+    "ISSUE_TYPE_LABELS": []
+}
 
 def get_local_perception_engine():
     global _ORT_SESSION, _TOKENIZER
@@ -55,6 +33,17 @@ def get_local_perception_engine():
             
         if not os.path.exists(onnx_path):
             raise FileNotFoundError(f"ONNX model not found at: {onnx_path}")
+            
+        labels_path = os.path.join(os.path.dirname(onnx_path), "label_maps.json")
+        if os.path.exists(labels_path):
+            with open(labels_path, "r") as f:
+                maps = json.load(f)
+                _LABELS["PRIMARY_DOMAIN_LABELS"] = maps.get("primary_domain_labels", [])
+                _LABELS["SUB_DOMAIN_LABELS"] = maps.get("sub_domain_labels", [])
+                _LABELS["ISSUE_TYPE_LABELS"] = maps.get("issue_type_labels", [])
+                print(f"[LocalPerception] Loaded {len(_LABELS['ISSUE_TYPE_LABELS'])} issue labels.")
+        else:
+            print("[LocalPerception] WARNING: label_maps.json not found! Predictions may be out of bounds.")
             
         _TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
         
@@ -110,7 +99,14 @@ async def predict_local(text, city="Chennai", ward=0, channel="Web App"):
     vulnerable_logit = ort_outputs[5]
     
     # Post-process
+    # Domain used BCE in training, so we use sigmoid to get independent probabilities
+    def sigmoid(x):
+        return 1.0 / (1.0 + np.exp(-x))
+    
+    domain_probs = sigmoid(domain_logits)
     domain_idx = np.argmax(domain_logits)
+    
+    # Subdomain and Issue use Softmax
     subdomain_idx = np.argmax(subdomain_logits)
     issue_idx = np.argmax(issue_logits)
     
@@ -126,23 +122,29 @@ async def predict_local(text, city="Chennai", ward=0, channel="Web App"):
     is_vuln = bool(vulnerable_logit[0] > 0)
     
     # Calculate real confidence (probability)
-    domain_probs = softmax(domain_logits)
+    # domain_probs already calculated via sigmoid
     subdomain_probs = softmax(subdomain_logits)
     issue_probs = softmax(issue_logits)
     
-    # Use average of the main classification tasks as overall confidence
-    # or just the most specific one (issue_type)
-    # We'll take the minimum of the three to be conservative
-    confidence = float(min(
-        domain_probs[0, domain_idx],
-        subdomain_probs[0, subdomain_idx],
-        issue_probs[0, issue_idx]
-    ))
+    # Use the confidence of the most specific classification task (issue type)
+    # as the overall confidence, since it drives the entire routing logic.
+    confidence = float(issue_probs[0, issue_idx])
+    
+    # Identify top domains (prob > 0.3 or at least the max one if none exceed threshold)
+    domain_indices = np.argsort(domain_probs[0])[::-1]
+    top_domains = []
+    for idx in domain_indices:
+        if domain_probs[0, idx] > 0.3 or len(top_domains) == 0:
+            top_domains.append({
+                "domain": _LABELS["PRIMARY_DOMAIN_LABELS"][idx] if _LABELS["PRIMARY_DOMAIN_LABELS"] else str(idx),
+                "score": float(domain_probs[0, idx])
+            })
     
     return {
-        "primary_domain": PRIMARY_DOMAIN_LABELS[domain_idx],
-        "sub_domain": SUB_DOMAIN_LABELS[subdomain_idx],
-        "issue_type": ISSUE_TYPE_LABELS[issue_idx],
+        "primary_domain": _LABELS["PRIMARY_DOMAIN_LABELS"][domain_idx] if _LABELS["PRIMARY_DOMAIN_LABELS"] else str(domain_idx),
+        "top_domains": top_domains,
+        "sub_domain": _LABELS["SUB_DOMAIN_LABELS"][subdomain_idx] if _LABELS["SUB_DOMAIN_LABELS"] else str(subdomain_idx),
+        "issue_type": _LABELS["ISSUE_TYPE_LABELS"][issue_idx] if _LABELS["ISSUE_TYPE_LABELS"] else str(issue_idx),
         "severity_level": round(severity_level),
         "public_safety_flag": is_safety,
         "vulnerable_population_flag": is_vuln,

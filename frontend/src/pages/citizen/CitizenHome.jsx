@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { COMPLAINTS, CITIZEN_STATS, CATEGORIES, formatDate, timeAgo, getCategoryById } from '../../data/mockData';
+import { complaintService } from '../../services/complaintService';
+import { mapComplaint, formatDate, DOMAIN_EMOJIS } from '../../utils/helpers';
 import { StatusBadge, PriorityBadge } from '../../components/SharedComponents';
 import MapComponent from '../../components/MapComponent';
 import { PlusCircle, TrendingUp, MapPin, ChevronRight, ArrowUpCircle, Hand, ClipboardList, CheckCircle2, Settings } from 'lucide-react';
@@ -8,10 +10,26 @@ import { PlusCircle, TrendingUp, MapPin, ChevronRight, ArrowUpCircle, Hand, Clip
 export default function CitizenHome() {
   const { user } = useApp();
   const navigate = useNavigate();
-  const myCmplaints = COMPLAINTS.filter(c => c.citizenId === 'citizen-1');
-  const trending = [...COMPLAINTS].sort((a, b) => b.upvotes - a.upvotes).slice(0, 5);
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  useEffect(() => {
+    complaintService.listComplaints({ limit: 50 })
+      .then(data => setComplaints((data || []).map(mapComplaint)))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const myComplaints = complaints.filter(c => c.citizen_id === (user?.name || ''));
+  // Fall back to all complaints if user filter returns nothing (e.g. for demo)
+  const displayComplaints = myComplaints.length > 0 ? myComplaints : complaints;
+
+  const total = displayComplaints.length;
+  const resolved = displayComplaints.filter(c => c.status === 'resolved').length;
+  const inProgress = displayComplaints.filter(c => c.status === 'in_progress').length;
+  const trending = [...complaints].sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0)).slice(0, 5);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
@@ -31,9 +49,9 @@ export default function CitizenHome() {
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           {[
-            { label: 'Total Raised', value: CITIZEN_STATS.total, icon: <ClipboardList size={22} /> },
-            { label: 'Resolved', value: CITIZEN_STATS.resolved, icon: <CheckCircle2 size={22} /> },
-            { label: 'In Progress', value: CITIZEN_STATS.inProgress, icon: <Settings size={22} /> },
+            { label: 'Total Raised', value: loading ? '...' : total, icon: <ClipboardList size={22} /> },
+            { label: 'Resolved', value: loading ? '...' : resolved, icon: <CheckCircle2 size={22} /> },
+            { label: 'In Progress', value: loading ? '...' : inProgress, icon: <Settings size={22} /> },
           ].map(s => (
             <div key={s.label} style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: '14px 16px', backdropFilter: 'blur(4px)' }}>
               <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
@@ -66,9 +84,9 @@ export default function CitizenHome() {
           </button>
         </div>
         <div style={{ padding: '0 0 16px 0' }}>
-          <MapComponent complaints={COMPLAINTS} height={280} onPinClick={() => {}} />
+          <MapComponent complaints={complaints} height={280} onPinClick={() => {}} />
           <div style={{ display: 'flex', gap: 12, padding: '12px 24px 0', overflowX: 'auto' }}>
-            {COMPLAINTS.slice(0, 4).map(c => (
+            {complaints.slice(0, 4).map(c => (
               <div
                 key={c.id}
                 onClick={() => navigate(`/citizen/tracking/${c.id}`)}
@@ -85,7 +103,7 @@ export default function CitizenHome() {
                   <PriorityBadge priority={c.priority} />
                 </div>
                 <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>
-                <p style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}><MapPin size={10} style={{ marginRight: 2 }} />{c.ward}</p>
+                <p style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}><MapPin size={10} style={{ marginRight: 2 }} />{c.ward || 'Chennai'}</p>
               </div>
             ))}
           </div>
@@ -101,8 +119,10 @@ export default function CitizenHome() {
           <button className="btn btn-ghost btn-sm" onClick={() => navigate('/citizen/map')}>See all</button>
         </div>
         <div className="card">
-          {trending.map((c, i) => {
-            const cat = getCategoryById(c.category);
+          {loading ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-neutral-400)' }}>Loading...</div>
+          ) : trending.map((c, i) => {
+            const emoji = DOMAIN_EMOJIS[c.domain] || '📋';
             return (
               <div
                 key={c.id}
@@ -122,11 +142,11 @@ export default function CitizenHome() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 18, flexShrink: 0,
                 }}>
-                  {cat.icon}
+                  {emoji}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>
-                  <p style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{c.ward}</p>
+                  <p style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{c.ward || 'Chennai'}</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--color-danger)', fontSize: 13, fontWeight: 600 }}>

@@ -20,7 +20,7 @@ from app.agents.duplicate_agent import run_duplicate_agent
 from app.agents.perception_agent import run_perception_agent
 from app.agents.priority_agent import run_priority_agent, resolve_ward_id
 from app.agents.routing_agent import run_routing_agent
-from app.db.mongodb import audit_logs_col, complaints_col, config_col
+from app.db.mongodb import audit_logs_col, complaints_col, config_col, get_db
 from app.models.complaint import ComplaintStatus
 
 
@@ -42,6 +42,7 @@ class GraphState(TypedDict):
 
     needs_human_review: bool
     assigned_department: str           # Resolved inside Agent 3
+    clip_validation_result: dict | None # Result of image-text verification
     error: str | None
 
 
@@ -77,6 +78,30 @@ async def _resolve_ward_id(lat: float, lng: float) -> int | None:
     except Exception as e:
         print(f"[WardResolver] {e}")
         return None
+
+
+async def _get_user_trust_score(user_id: str | None) -> float:
+    """
+    Looks up the user's civic trust reputation score (0.0 to 1.0).
+    Defaults to 0.5 for anonymous or unknown users.
+    """
+    if not user_id:
+        return 0.5
+    try:
+        db = get_db()
+        user_doc = await db["users"].find_one({"user_id": user_id})
+        if user_doc:
+            return float(user_doc.get("trust_score", 0.5))
+        
+        # Mocking for testing: string flags in ID
+        if "supercitizen" in user_id.lower():
+            return 0.95
+        if "spammer" in user_id.lower():
+            return 0.10
+            
+    except Exception as e:
+        print(f"[CivicTrust] Error resolving user {user_id}: {e}")
+    return 0.5
 
 
 async def _get_department_for_domain(primary_domain: str, sub_domain: str, safety_flag: bool) -> str:
@@ -131,6 +156,57 @@ async def perception_node(state: GraphState) -> GraphState:
         print(f"[Perception] ERROR: {e}")
         traceback.print_exc()
         return {**state, "error": f"Perception agent failed: {str(e)}", "needs_human_review": True}
+
+# ─── Agent 1.5: CLIP Image Validation ─────────────────────────────────────────
+
+from app.agents.clip_agent import verify_image_context
+
+async def clip_validation_node(state: GraphState) -> GraphState:
+    """
+    Validates if the user-uploaded photo matches the perception-classified text.
+    Overrides needs_human_review if mismatch is detected.
+    """
+    if state.get("error"):
+        return state
+
+    request = state["request"]
+    photo_path = request.get("photo_local_path")
+    domain = state.get("domain_classification") or {}
+    
+    # ── Context Engine: User Reputation Bypass ────────────────────────────────
+    trust_score = await _get_user_trust_score(request.get("user_id"))
+    state["request"]["user_trust_score"] = trust_score  # Cache for storage
+    
+    if trust_score > 0.90:
+        print(f"[CivicTrust] Score {trust_score} > 0.90. Bypassing CLIP verification.")
+        state["rules_triggered"] = state.get("rules_triggered", []) + ["RULE_HIGH_TRUST_BYPASS"]
+        return state
+        
+    if trust_score < 0.20:
+        print(f"[CivicTrust] Score {trust_score} < 0.20. Low Trust. Forcing manual review.")
+        state["needs_human_review"] = True
+        state["rules_triggered"] = state.get("rules_triggered", []) + ["RULE_LOW_TRUST_HUMAN_REVIEW"]
+    
+    if not photo_path:
+        return state
+
+    issue_type = domain.get("issue_type", "unknown")
+    sub_domain = domain.get("sub_domain", "unknown")
+
+    try:
+        clip_result = await verify_image_context(photo_path, issue_type, sub_domain)
+        state["clip_validation_result"] = clip_result
+        
+        if not clip_result.get("is_match", True):
+            print(f"[CLIP Validation] Image context mismatch! Confidence: {clip_result.get('match_probability')}")
+            state["needs_human_review"] = True
+            state["rules_triggered"] = state.get("rules_triggered", []) + ["RULE_CLIP_IMAGE_MISMATCH"]
+            
+        return state
+    except Exception as e:
+        print(f"[CLIP Node Error] {e}")
+        return state
+
 
 
 # ─── Agent 2: Duplicate Detection ─────────────────────────────────────────────
@@ -203,6 +279,8 @@ async def priority_node(state: GraphState) -> GraphState:
         longitude=request.get("longitude", 0.0),
         ward_id=request.get("ward_id"),
         primary_domain=domain.get("primary_domain", ""),
+        issue_type=domain.get("issue_type", ""),
+        is_cascading_failure=duplicate_result.get("is_cascading_failure", False),
     )
 
     updated_request = {**request, "ward_id": ward_id} if ward_id else request
@@ -366,6 +444,7 @@ async def store_node(state: GraphState) -> GraphState:
             "confidence": domain.get("confidence", 1.0),
             "perception_reasoning": domain.get("perception_reasoning"),
         },
+        "clip_validation": state.get("clip_validation_result"),
         "priority_assessment": priority,
         "governance_and_sla": routing,
         "agent_traceability": {
@@ -376,6 +455,7 @@ async def store_node(state: GraphState) -> GraphState:
             "rules_triggered": state.get("rules_triggered", []),
             "decision_explanation": state.get("decision_explanation", ""),
             "manual_override_flag": False,
+            "user_trust_score": request.get("user_trust_score", 0.5),
         },
         "needs_human_review": needs_human,
         "error": error,
@@ -413,6 +493,7 @@ def build_workflow() -> StateGraph:
     graph = StateGraph(GraphState)
 
     graph.add_node("perception", perception_node)   # Agent 1
+    graph.add_node("clip_validation", clip_validation_node) # Agent 1.5
     graph.add_node("duplicate",  duplicate_node)    # Agent 2
     graph.add_node("priority",   priority_node)     # Agent 3 (includes context + ward)
     graph.add_node("routing",    routing_node)      # Agent 4
@@ -420,7 +501,8 @@ def build_workflow() -> StateGraph:
     graph.add_node("store",      store_node)
 
     graph.add_edge(START, "perception")
-    graph.add_edge("perception", "duplicate")
+    graph.add_edge("perception", "clip_validation")
+    graph.add_edge("clip_validation", "duplicate")
     graph.add_edge("duplicate", "priority")
 
     # Conditional: low confidence or error → human_review, else → routing
@@ -462,6 +544,7 @@ async def process_complaint(request_data: dict, report_id: str) -> GraphState:
         "domain_classification": None,
         "priority_result": None,
         "routing_result": None,
+        "clip_validation_result": None,
         "rules_triggered": [],
         "decision_explanation": "",
         "needs_human_review": False,

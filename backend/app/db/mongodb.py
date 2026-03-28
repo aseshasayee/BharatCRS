@@ -174,11 +174,9 @@ async def _seed_config() -> None:
                 "Street Lighting": "GCC Electrical",
             },
             "Sanitation, Environment & Parks": {
-                "Garbage": "GCC Sanitation",
-                "Sewage": "CMWSSB",
+                "Garbage & Waste": "GCC Sanitation",
                 "Environment": "Public Health Department",
                 "Vector Control": "Public Health Department",
-                "Parks": "GCC Parks",
             },
             "Transportation & Traffic": {
                 "Traffic Signals": "Traffic Police",
@@ -192,15 +190,14 @@ async def _seed_config() -> None:
                 "Demolition": "CMDA",
             },
             "Social Infrastructure & Public Health": {
-                "Food Safety": "Public Health Department",
-                "Child Welfare": "Child Welfare & Health Unit",
-                "Healthcare": "Health Department",
+                "Healthcare & Welfare": "Health Department",
                 "Schools": "Education Department",
             },
             "Emergency, Safety & Accountability": {
-                "Safety": "Fire & Safety Department",
-                "Emergency": "Disaster Management",
+                "Fire & Safety": "Fire & Safety Department",
+                "Disaster Management": "Disaster Management",
                 "Corruption": "Vigilance Department",
+                "Structural Safety": "CMDA",
             },
         },
         "sla_hours": {
@@ -308,6 +305,14 @@ async def _seed_config() -> None:
             "username": "admin",
             "password": "admin123",
             "role": "admin"
+        })
+
+    # Citizen User
+    if not await db["users"].find_one({"username": "citizen"}):
+        await db["users"].insert_one({
+            "username": "citizen",
+            "password": "citizen123",
+            "role": "citizen"
         })
 
     print("[DB] v3 Config, department metrics, users, and ward metadata seeded.")

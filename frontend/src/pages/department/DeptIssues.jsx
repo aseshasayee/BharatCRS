@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { COMPLAINTS, CATEGORIES, formatDateTime } from '../../data/mockData';
+import { useState, useEffect } from 'react';
+const DOMAINS = ['Core Infrastructure & Public Works','Sanitation, Environment & Parks','Transportation & Traffic','Social Infrastructure & Public Health','Emergency, Safety & Accountability','Urban Planning & Real Estate'];
 import { StatusBadge, PriorityBadge, CategoryChip, ConfirmDialog } from '../../components/SharedComponents';
 import { useApp } from '../../context/AppContext';
+import { complaintService } from '../../services/complaintService';
 import { Search, X, Clock, CheckCircle } from 'lucide-react';
 
 export default function DeptIssues() {
@@ -11,18 +12,41 @@ export default function DeptIssues() {
   const [confirmResolve, setConfirmResolve] = useState(null);
   const [resolveNote, setResolveNote] = useState('');
   const [statusModal, setStatusModal] = useState(null);
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const issues = COMPLAINTS.filter(c => c.assignedTo === 'pwd' && c.status !== 'resolved');
-  const filtered = issues.filter(c =>
-    (!search || c.id.includes(search) || c.title.toLowerCase().includes(search.toLowerCase())) &&
-    (!filters.priority || c.priority === filters.priority) &&
-    (!filters.status || c.status === filters.status)
-  );
+  const loadIssues = async () => {
+    setLoading(true);
+    try {
+      // In a real app we'd filter by the logged-in department
+      const data = await complaintService.listComplaints({ limit: 50 });
+      setComplaints(data || []);
+    } catch (err) {
+      addToast('Failed to load issues', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadIssues(); }, []);
+
+  const filtered = complaints.filter(c => {
+    const status = c.common_metadata?.status || '';
+    const reportId = c.common_metadata?.report_id || '';
+    const priority = c.priority_assessment?.priority_class || '';
+    return (!search || reportId.toLowerCase().includes(search.toLowerCase())) &&
+           (!filters.priority || priority.toLowerCase() === filters.priority.toLowerCase()) &&
+           (!filters.status || status.toLowerCase() === filters.status.toLowerCase());
+  });
 
   const handleAccept = (id) => addToast(`${id} — Status updated to In Progress`, 'success');
-  const handleResolve = () => {
+  const handleResolve = async () => {
     if (!resolveNote) { addToast('Please add a resolution note', 'warning'); return; }
-    addToast(`${confirmResolve} resolved successfully`, 'success');
+    try {
+      await complaintService.resolveComplaint(confirmResolve);
+      addToast(`${confirmResolve} resolved successfully`, 'success');
+      loadIssues();
+    } catch (e) { addToast('Failed to resolve complaint', 'error'); }
     setConfirmResolve(null); setResolveNote('');
   };
 
@@ -74,32 +98,43 @@ export default function DeptIssues() {
                 <th>Assigned Date</th><th>SLA Deadline</th><th>Status</th><th>Actions</th>
               </tr>
             </thead>
+            {loading ? (
+              <tbody><tr><td colSpan="8" style={{ textAlign: 'center', padding: 20 }}>Loading...</td></tr></tbody>
+            ) : (
             <tbody>
               {filtered.map(c => {
-                const sla = timeRemaining(c.slaDeadline);
+                const id = c.common_metadata?.report_id;
+                const status = c.common_metadata?.status?.toLowerCase() || 'submitted';
+                const priority = c.priority_assessment?.priority_class?.toLowerCase() || 'low';
+                const category = c.domain_classification?.primary_domain || 'Unknown';
+                const ward = `Ward ${c.spatio_temporal_core?.administrative_unit?.ward_id || '?'}`;
+                const submittedAt = new Date(c.common_metadata?.submission_timestamp).toLocaleDateString();
+                
+                // Mock SLA deadline based on submission time + SLA hours
+                const slaHours = c.governance_and_sla?.sla_hours || 48;
+                const t = new Date(c.common_metadata?.submission_timestamp);
+                t.setHours(t.getHours() + slaHours);
+                const sla = timeRemaining(t);
+
                 return (
-                  <tr key={c.id} className={c.priority === 'high' ? 'high-priority' : ''}>
-                    <td><span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-primary)', fontWeight: 700 }}>{c.id}</span></td>
-                    <td><CategoryChip category={c.category} /></td>
-                    <td><PriorityBadge priority={c.priority} /></td>
-                    <td style={{ fontSize: 13 }}>{c.ward}</td>
-                    <td style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{formatDateTime(c.submittedAt)}</td>
+                  <tr key={id} className={priority === 'high' || priority === 'critical' ? 'high-priority' : ''}>
+                    <td><span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-primary)', fontWeight: 700 }}>{id}</span></td>
+                    <td><CategoryChip category={category} /></td>
+                    <td><PriorityBadge priority={priority} /></td>
+                    <td style={{ fontSize: 13 }}>{ward}</td>
+                    <td style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{submittedAt}</td>
                     <td>
                       <div>
-                        <p style={{ fontSize: 12 }}>{formatDateTime(c.slaDeadline)}</p>
+                        <p style={{ fontSize: 12 }}>{t.toLocaleString()}</p>
                         <p style={{ fontSize: 11, color: sla.color, fontWeight: 600, marginTop: 2 }}>
                           <Clock size={10} style={{ marginRight: 3 }} />{sla.text}
                         </p>
                       </div>
                     </td>
-                    <td><StatusBadge status={c.status} /></td>
+                    <td><StatusBadge status={status} /></td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        {c.status === 'assigned' && (
-                          <button className="btn btn-primary btn-sm" onClick={() => handleAccept(c.id)} style={{ padding: '4px 8px' }}>Accept</button>
-                        )}
-                        <button className="btn btn-secondary btn-sm" onClick={() => setStatusModal(c)} style={{ padding: '4px 8px' }}>Update</button>
-                        <button className="btn btn-success btn-sm" onClick={() => setConfirmResolve(c.id)} style={{ padding: '4px 8px' }}>
+                        <button className="btn btn-success btn-sm" onClick={() => setConfirmResolve(id)} style={{ padding: '4px 8px' }}>
                           <CheckCircle size={12} />
                         </button>
                       </div>
@@ -107,7 +142,7 @@ export default function DeptIssues() {
                   </tr>
                 );
               })}
-            </tbody>
+            </tbody>)}
           </table>
         </div>
       </div>

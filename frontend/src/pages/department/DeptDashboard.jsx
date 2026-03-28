@@ -1,22 +1,61 @@
+import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { COMPLAINTS, DEPT_METRICS, CHART_DEPT_SLA, formatDateTime } from '../../data/mockData';
+// Note: Chart data is now derived from real API stats (department_metrics from statsService)
+import { statsService } from '../../services/statsService';
+import { complaintService } from '../../services/complaintService';
 import { MetricCard, StatusBadge, PriorityBadge } from '../../components/SharedComponents';
-import { useApp } from '../../context/AppContext';
 import { Clock, AlertTriangle, ClipboardList, CheckCircle2, BarChart2 } from 'lucide-react';
 
 export default function DeptDashboard() {
   const { addToast } = useApp();
-  const deptComplaints = COMPLAINTS.filter(c => c.assignedTo === 'pwd');
-  const upcoming = deptComplaints.filter(c => c.status !== 'resolved').slice(0, 3);
+  const [stats, setStats] = useState({
+    assigned: 0,
+    completedToday: 0,
+    slaCompliant: 0,
+    overdue: 0
+  });
+  const [upcoming, setUpcoming] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statsData, complaintsData] = await Promise.all([
+           statsService.getStats(),
+           complaintService.listComplaints({ limit: 5 })
+        ]);
+        
+        let deptMetrics = null;
+        if(statsData.department_metrics && statsData.department_metrics.length > 0) {
+            deptMetrics = statsData.department_metrics[0];
+        }
+
+        setStats({
+          assigned: deptMetrics ? deptMetrics.total_complaints : 0,
+          completedToday: deptMetrics ? deptMetrics.resolved_on_time : 0, // Mocking
+          slaCompliant: deptMetrics ? Math.round(deptMetrics.sla_compliance_rate * 100) : 0,
+          overdue: statsData.sla_breached || 0
+        });
+
+        const filtered = (complaintsData || []).filter(c => c.common_metadata?.status?.toLowerCase() !== 'resolved').slice(0, 3);
+        setUpcoming(filtered);
+      } catch (err) {
+        console.error('Failed to load department data', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       {/* Metrics */}
       <div className="grid-4">
-        <MetricCard icon={<ClipboardList size={24} color="var(--color-primary)" />} label="Assigned Issues" value={DEPT_METRICS.assigned} iconBg="var(--color-primary-light)" />
-        <MetricCard icon={<CheckCircle2 size={24} color="var(--color-success)" />} label="Completed Today" value={DEPT_METRICS.completedToday} iconBg="var(--color-success-light)" />
-        <MetricCard icon={<BarChart2 size={24} color="var(--color-warning)" />} label="SLA Compliant" value={`${DEPT_METRICS.slaCompliant}%`} iconBg="var(--color-warning-light)" />
-        <MetricCard icon={<AlertTriangle size={24} color="var(--color-danger)" />} label="Overdue" value={DEPT_METRICS.overdue} deltaDir="down" iconBg="var(--color-danger-light)" />
+        <MetricCard icon={<ClipboardList size={24} color="var(--color-primary)" />} label="Assigned Issues" value={stats.assigned} iconBg="var(--color-primary-light)" />
+        <MetricCard icon={<CheckCircle2 size={24} color="var(--color-success)" />} label="Resolved On Time" value={stats.completedToday} iconBg="var(--color-success-light)" />
+        <MetricCard icon={<BarChart2 size={24} color="var(--color-warning)" />} label="SLA Compliant" value={`${stats.slaCompliant}%`} iconBg="var(--color-warning-light)" />
+        <MetricCard icon={<AlertTriangle size={24} color="var(--color-danger)" />} label="Overdue / Breached" value={stats.overdue} deltaDir="down" iconBg="var(--color-danger-light)" />
       </div>
 
       {/* SLA chart */}
@@ -47,31 +86,38 @@ export default function DeptDashboard() {
           <span className="badge badge-assigned">Next 24hrs</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {upcoming.map((c, i) => (
-            <div key={c.id} style={{
+          {upcoming.map((c, i) => {
+            const id = c.common_metadata?.report_id;
+            const status = c.common_metadata?.status?.toLowerCase() || 'submitted';
+            const priority = c.priority_assessment?.priority_class?.toLowerCase() || 'low';
+            const title = c.common_metadata?.raw_text || 'No description provided';
+            
+            const slaHours = c.governance_and_sla?.sla_hours || 48;
+            const t = new Date(c.common_metadata?.submission_timestamp);
+            t.setHours(t.getHours() + slaHours);
+
+            return (
+            <div key={id} style={{
               display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px',
               borderBottom: i < upcoming.length - 1 ? '1px solid var(--color-neutral-100)' : 'none',
-              borderLeft: c.priority === 'high' ? '3px solid var(--color-danger)' : '3px solid transparent',
+              borderLeft: priority === 'high' || priority === 'critical' ? '3px solid var(--color-danger)' : '3px solid transparent',
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-primary)', fontWeight: 700 }}>{c.id}</span>
-                  <PriorityBadge priority={c.priority} />
+                  <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-primary)', fontWeight: 700 }}>{id}</span>
+                  <PriorityBadge priority={priority} />
                 </div>
-                <p style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>
+                <p style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</p>
                 <p style={{ fontSize: 12, color: 'var(--color-neutral-600)', marginTop: 2 }}>
                   <AlertTriangle size={11} color="var(--color-warning)" style={{ marginRight: 4 }} />
-                  SLA: {formatDateTime(c.slaDeadline)}
+                  SLA: {t.toLocaleString()}
                 </p>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                <StatusBadge status={c.status} />
-                <button className="btn btn-primary btn-sm" onClick={() => addToast(`Status updated for ${c.id}`, 'success')}>
-                  Update Status
-                </button>
+                <StatusBadge status={status} />
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
     </div>

@@ -15,7 +15,7 @@ import time
 
 import torch
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from sklearn.metrics import accuracy_score, f1_score
 
 from config import (
@@ -45,6 +45,11 @@ def validate(model, dataloader, loss_fn, device) -> dict:
 
     total_loss = 0.0
     loss_breakdown_accum = {}
+    
+    # Tracking for top-2 domain metric
+    domain_top2_correct = 0
+    domain_total = 0
+
     all_preds = {
         "domain": [], "subdomain": [], "issue": [],
         "safety": [], "vulnerable": [],
@@ -76,11 +81,18 @@ def validate(model, dataloader, loss_fn, device) -> dict:
             loss_breakdown_accum[k] = loss_breakdown_accum.get(k, 0.0) + v
 
         # Collect predictions
+        # For domain, model trained with BCE, so logit > 0 or top1 is primary prediction.
         all_preds["domain"].extend(preds["domain_logits"].argmax(dim=1).cpu().tolist())
         all_preds["subdomain"].extend(preds["subdomain_logits"].argmax(dim=1).cpu().tolist())
         all_preds["issue"].extend(preds["issue_logits"].argmax(dim=1).cpu().tolist())
         all_preds["safety"].extend((preds["safety_logit"] > 0).int().cpu().tolist())
         all_preds["vulnerable"].extend((preds["vulnerable_logit"] > 0).int().cpu().tolist())
+
+        # Top-2 Domain Evaluation
+        top2_domain_indices = preds["domain_logits"].topk(2, dim=1).indices
+        correct_in_top2 = (top2_domain_indices == targets["domain_label"].unsqueeze(1)).any(dim=1).sum().item()
+        domain_top2_correct += correct_in_top2
+        domain_total += len(targets["domain_label"])
 
         all_targets["domain"].extend(batch["domain_label"].tolist())
         all_targets["subdomain"].extend(batch["subdomain_label"].tolist())
@@ -99,6 +111,7 @@ def validate(model, dataloader, loss_fn, device) -> dict:
     metrics = {
         "val_loss": avg_loss,
         "domain_acc": accuracy_score(all_targets["domain"], all_preds["domain"]),
+        "domain_top2_acc": domain_top2_correct / max(domain_total, 1),
         "domain_f1": f1_score(all_targets["domain"], all_preds["domain"], average="weighted", zero_division=0),
         "subdomain_acc": accuracy_score(all_targets["subdomain"], all_preds["subdomain"]),
         "subdomain_f1": f1_score(all_targets["subdomain"], all_preds["subdomain"], average="weighted", zero_division=0),
@@ -156,26 +169,22 @@ def train(args):
     # Override defaults if flags provided
     weight_decay = args.weight_decay if args.weight_decay is not None else WEIGHT_DECAY
     
+    encoder_params = [p for n, p in model.named_parameters() if 'encoder' in n and p.requires_grad]
+    head_params = [p for n, p in model.named_parameters() if 'encoder' not in n and p.requires_grad]
+
     optimizer = AdamW(
-        model.parameters(),
-        lr=args.lr,
+        [
+            {"params": encoder_params, "lr": 5e-6},
+            {"params": head_params, "lr": 2e-4}
+        ],
         weight_decay=weight_decay,
     )
 
     total_steps = (len(train_loader) // args.grad_accumulation) * args.epochs
     
-    # Calculate warmup ratio (either step-based or percent-based)
-    if args.warmup_steps > 0:
-        warmup_pct = args.warmup_steps / total_steps
-    else:
-        warmup_pct = WARMUP_RATIO
-
-    scheduler = OneCycleLR(
+    scheduler = CosineAnnealingWarmRestarts(
         optimizer,
-        max_lr=args.lr,
-        total_steps=total_steps,
-        pct_start=min(warmup_pct, 0.5), # Cap warmup at 50%
-        anneal_strategy="cos",
+        T_0=4,
     )
 
     # ── FP16 / AMP Setup ──
@@ -254,7 +263,7 @@ def train(args):
         print(f"  Epoch {epoch}/{args.epochs} Summary ({epoch_time:.1f}s)")
         print(f"  Train Loss:       {avg_train_loss:.4f}")
         print(f"  Val Loss:         {val_loss:.4f}")
-        print(f"  Domain Acc/F1:    {val_metrics['domain_acc']:.3f} / {val_metrics['domain_f1']:.3f}")
+        print(f"  Domain Acc/F1/T2: {val_metrics['domain_acc']:.3f} / {val_metrics['domain_f1']:.3f} / {val_metrics['domain_top2_acc']:.3f}")
         print(f"  SubDomain Acc/F1: {val_metrics['subdomain_acc']:.3f} / {val_metrics['subdomain_f1']:.3f}")
         print(f"  IssueType Acc/F1: {val_metrics['issue_acc']:.3f} / {val_metrics['issue_f1']:.3f}")
         print(f"  Severity MAE:     {val_metrics['severity_mae']:.2f}")
@@ -364,7 +373,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE, help="Batch size")
     parser.add_argument("--lr", type=float, default=LEARNING_RATE, help="Learning rate")
     parser.add_argument("--fp16", action="store_true", help="Enable Mixed Precision training")
-    parser.add_argument("--grad_accumulation", type=int, default=1, help="Steps for gradient accumulation")
+    parser.add_argument("--grad_accumulation", type=int, default=4, help="Steps for gradient accumulation")
     parser.add_argument("--freeze_layers", action="store_true", help="Freezes all but last 2 transformer layers")
     parser.add_argument("--warmup_steps", type=int, default=0, help="Number of steps for warmup (overrides ratio)")
     parser.add_argument("--weight_decay", type=float, default=None, help="Weight decay for optimizer")

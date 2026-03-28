@@ -9,9 +9,11 @@ export default function LandingPage() {
       {/* Header */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 48px', background: 'transparent' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, background: 'var(--color-primary)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: 20 }}>
-            B
-          </div>
+          <img
+            src="/logo.svg"
+            alt="BharatCRS logo"
+            style={{ width: 44, height: 44, objectFit: 'contain' }}
+          />
           <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-primary)', fontFamily: 'Poppins, sans-serif' }}>BharatCRS</span>
         </div>
         <button className="btn btn-primary" style={{ padding: '10px 32px', borderRadius: '40px', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em' }} onClick={() => navigate('/login')}>
@@ -21,9 +23,6 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px', position: 'relative' }}>
-        {/* Background decorative blob */}
-        <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: '50%', height: '120%', background: '#EBF1FA', borderRadius: '50% 0 0 50%', zIndex: 0, opacity: 0.8 }} />
-        
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'center', maxWidth: 1200, margin: '0 auto', position: 'relative', zIndex: 1, width: '100%' }}>
           
           {/* Hero Text Content */}
@@ -44,7 +43,17 @@ export default function LandingPage() {
 
           {/* Hero Illustration */}
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <img src="/hero-illustration.png" alt="Civic Reporting Illustration" style={{ width: '100%', maxWidth: 500, height: 'auto', objectFit: 'contain' }} />
+            <img
+              src="/landing-page.png"
+              alt="Civic Reporting Illustration"
+              style={{
+                width: '100%',
+                maxWidth: 500,
+                height: 'auto',
+                objectFit: 'contain',
+                boxShadow: 'none',
+              }}
+            />
           </div>
         </div>
       </main>

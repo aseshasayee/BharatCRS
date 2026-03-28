@@ -16,6 +16,7 @@ Weights from MongoDB config (admin-adjustable):
   R: 0.25  F: 0.35  E: 0.25  A: 0.15  equity: 0.40
 """
 import math
+import httpx
 from datetime import datetime, timezone
 from math import asin, cos, radians, sin, sqrt
 
@@ -44,6 +45,30 @@ DEFAULT_DOMAIN_RISK_BONUS = {
 }
 
 RECENCY_DECAY_HOURS = 72
+
+# ─── Context Engine: Active Events Mock ───────────────────────────────────────
+
+ACTIVE_EVENT_ZONES = {
+    11: "Public Elections",
+    80: "Diwali Festival Route",
+    13: "VIP Convoy Route",
+}
+
+async def _get_weather_context(lat: float, lng: float) -> str:
+    """Fetches real-time weather from Open-Meteo API."""
+    try:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}&current=precipitation,weather_code"
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json().get("current", {})
+                precip = data.get("precipitation", 0.0)
+                if precip > 0.0:
+                    return "Rain"
+                return "Clear"
+    except Exception as e:
+        print(f"[Agent3/Weather] Failed to fetch weather: {e}")
+    return "Unknown"
 
 
 # ─── Sub-step 3a: Context Lookup ─────────────────────────────────────────────
@@ -246,6 +271,8 @@ async def run_priority_agent(
     longitude: float,
     ward_id: int | None = None,
     primary_domain: str = "",
+    issue_type: str = "",
+    is_cascading_failure: bool = False,
     context_indicators: dict | None = None,   # optional pre-computed context
 ) -> tuple[PriorityAssessment, dict, int | None]:
     """
@@ -272,6 +299,25 @@ async def run_priority_agent(
         context = await _lookup_context(latitude, longitude, ward_id)
         print(f"[Agent3/Context] source={context.get('context_source')} "
               f"area_score={context.get('area_importance_score')}")
+
+    # ── Context Engine: Dynamic Signals ───────────────────────────────────────
+    weather_condition = await _get_weather_context(latitude, longitude)
+    
+    hour = submission_timestamp.hour
+    if hour >= 18 or hour < 6:
+        temporal_context = "Night"
+    elif (8 <= hour <= 10) or (17 <= hour <= 19):
+        temporal_context = "Peak Traffic"
+    else:
+        temporal_context = "Standard"
+
+    active_event = ACTIVE_EVENT_ZONES.get(ward_id)
+    
+    context.update({
+        "weather_condition": weather_condition,
+        "temporal_context": temporal_context,
+        "active_event_proximity": bool(active_event),
+    })
 
     # ── Load config from MongoDB ──────────────────────────────────────────────
     config = await config_col().find_one({"_id": "rfm_weights"})
@@ -310,10 +356,40 @@ async def run_priority_agent(
         w_r * recency + w_f * frequency + w_e * exec_response_mean + w_a * area_adjusted
     )), 2)
 
-    # Domain risk bonus (admin-configurable, applied after base)
+    # Context Engine Dynamic Multipliers
+    context_bonus = 0.0
+    issue_lower = issue_type.lower()
+    
+    # 1. Weather Risk (Rain + Infrastructure/Sanitation)
+    if weather_condition == "Rain" and primary_domain in ["Core Infrastructure & Public Works", "Sanitation, Environment & Parks"]:
+        if any(keyword in issue_lower for keyword in ["road_damage", "flooding", "collapse", "drainage_sewage"]):
+            context_bonus += 2.0
+            print(f"[Agent3/ContextEngine] +2.0 risk bonus applied (Rain x {issue_type})")
+            
+    # 2. Temporal Risk (Night vs Peak)
+    if temporal_context == "Night" and any(keyword in issue_lower for keyword in ["lighting", "unsafe", "drainage_sewage", "vector"]):
+        context_bonus += 1.5
+        print(f"[Agent3/ContextEngine] +1.5 risk bonus applied (Night x {issue_type})")
+    elif temporal_context == "Peak Traffic" and any(keyword in issue_lower for keyword in ["signal", "road_damage", "transport", "parking"]):
+        context_bonus += 1.5
+        print(f"[Agent3/ContextEngine] +1.5 risk bonus applied (Peak Traffic x {issue_type})")
+
+    # 3. Active Event Risk
+    if active_event:
+        context_bonus += 2.0
+        print(f"[Agent3/ContextEngine] +2.0 risk bonus applied (Active Event: {active_event})")
+        
+    # 4. Cascading Failure Risk
+    if is_cascading_failure:
+        context_bonus += 3.0
+        print(f"[Agent3/ContextEngine] +3.0 risk bonus applied (Cascading Failure Link)")
+
+    # Domain risk bonus (admin-configurable)
     bonus_config = await _get_domain_risk_bonuses()
     domain_bonus = float(bonus_config.get(primary_domain, 0.0))
-    final_score = round(min(10.0, base_score + domain_bonus), 2)
+    
+    # Final Score
+    final_score = round(min(10.0, base_score + domain_bonus + context_bonus), 2)
 
     assessment = PriorityAssessment(
         rfm_metrics=RFMMetrics(

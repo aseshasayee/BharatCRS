@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { COMPLAINTS, PREDICTIONS } from '../../data/mockData';
+import { complaintService } from '../../services/complaintService';
+import { mapComplaint } from '../../utils/helpers';
 import MapComponent from '../../components/MapComponent';
 import { Brain, Map, Flame, TrendingUp, Lightbulb } from 'lucide-react';
 
@@ -17,7 +18,19 @@ const DEPT_PREDICTIONS = [
 
 export default function DeptPredictions() {
   const [days, setDays] = useState(7);
-  const pwdComplaints = COMPLAINTS.filter(c => c.assignedTo === 'pwd');
+  const [complaints, setComplaints] = useState([]);
+  const [deptPredictions, setDeptPredictions] = useState([]);
+
+  useEffect(() => {
+    complaintService.listComplaints({ limit: 200 }).then(data => {
+      const mapped = (data||[]).map(mapComplaint);
+      setComplaints(mapped);
+      const wardCounts = {};
+      mapped.forEach(c => { if (c.ward) wardCounts[c.ward] = (wardCounts[c.ward]||0)+1; });
+      setDeptPredictions(Object.entries(wardCounts).sort((a,b)=>b[1]-a[1]).slice(0,3)
+        .map(([ward,count],i) => ({ rank:i+1, ward, category:'Infrastructure', volume:count, confidence: Math.min(95, 60+count*3) })));
+    }).catch(console.error);
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -40,7 +53,7 @@ export default function DeptPredictions() {
             <h3 className="card-title" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Map size={20} /> Predicted Hotspot Zones</h3>
           </div>
           <div style={{ position: 'relative' }}>
-            <MapComponent complaints={pwdComplaints} height={380} />
+            <MapComponent complaints={complaints} height={380} />
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
               background: 'radial-gradient(ellipse at 40% 55%, rgba(220,38,38,0.18) 0%, rgba(217,119,6,0.1) 35%, transparent 60%)',
@@ -66,10 +79,10 @@ export default function DeptPredictions() {
           <div className="card">
             <div className="card-header"><h3 className="card-title" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Flame size={20} color="var(--color-danger)" /> Predicted Surge Areas</h3></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {DEPT_PREDICTIONS.map((p, i) => (
+              {deptPredictions.map((p, i) => (
                 <div key={p.rank} style={{
                   display: 'flex', gap: 12, padding: '12px 16px',
-                  borderBottom: i < DEPT_PREDICTIONS.length - 1 ? '1px solid var(--color-neutral-100)' : 'none',
+                  borderBottom: i < deptPredictions.length - 1 ? '1px solid var(--color-neutral-100)' : 'none',
                 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: '50%', flexShrink: 0,

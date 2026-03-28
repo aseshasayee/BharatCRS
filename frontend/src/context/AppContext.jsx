@@ -1,4 +1,5 @@
 import { createContext, useContext, useState } from 'react';
+import { authService } from '../services/authService';
 
 const AppContext = createContext(null);
 
@@ -9,14 +10,15 @@ export function AppProvider({ children }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
-  const login = (selectedRole) => {
-    const users = {
-      citizen: { name: 'Priya Sharma', initials: 'PS', phone: '+91 98765 43210', role: 'citizen', memberSince: 'Jan 2023' },
-      admin: { name: 'Admin User', initials: 'AU', email: 'admin@bharatcrs.gov.in', role: 'admin', memberSince: 'Jun 2022' },
-      department: { name: 'Dept. Officer', initials: 'DO', email: 'pwd@bharatcrs.gov.in', role: 'department', dept: 'Public Works Dept.', memberSince: 'Mar 2023' },
-    };
-    setUser(users[selectedRole]);
-    setRole(selectedRole);
+  const login = async (username, password) => {
+    try {
+      const data = await authService.login(username, password);
+      setUser({ name: data.username, department: data.department_name, initials: data.username.substring(0, 2).toUpperCase() });
+      setRole(data.role);
+      return data;
+    } catch (error) {
+      throw error;
+    }
   };
 
   const logout = () => { setRole(null); setUser(null); };
