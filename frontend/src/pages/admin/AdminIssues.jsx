@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { mapComplaint, DEPARTMENTS, CHENNAI_WARDS, DOMAIN_EMOJIS } from '../../utils/helpers';
-const DOMAINS = Object.keys(DOMAIN_EMOJIS);
+import { mapComplaint, DEPARTMENTS, CHENNAI_WARDS, DOMAIN_ICONS } from '../../utils/helpers';
+const DOMAINS = Object.keys(DOMAIN_ICONS);
 import { StatusBadge, PriorityBadge, CategoryChip, ConfirmDialog } from '../../components/SharedComponents';
 import { useApp } from '../../context/AppContext';
 import { complaintService } from '../../services/complaintService';

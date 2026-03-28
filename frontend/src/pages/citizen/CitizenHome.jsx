@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { complaintService } from '../../services/complaintService';
-import { mapComplaint, formatDate, DOMAIN_EMOJIS } from '../../utils/helpers';
+import { mapComplaint, formatDate, DOMAIN_ICONS } from '../../utils/helpers';
 import { StatusBadge, PriorityBadge } from '../../components/SharedComponents';
 import MapComponent from '../../components/MapComponent';
 import { PlusCircle, TrendingUp, MapPin, ChevronRight, ArrowUpCircle, Hand, ClipboardList, CheckCircle2, Settings } from 'lucide-react';
@@ -79,8 +79,8 @@ export default function CitizenHome() {
             <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MapPin size={20} /> Nearby Issues</h3>
             <p style={{ fontSize: 13, color: 'var(--color-neutral-600)', marginTop: 2 }}>Issues reported in your locality</p>
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/citizen/map')}>
-            View Full Map <ChevronRight size={14} />
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/citizen/heatmap')}>
+            View Full Heatmap <ChevronRight size={14} />
           </button>
         </div>
         <div style={{ padding: '0 0 16px 0' }}>
@@ -116,13 +116,12 @@ export default function CitizenHome() {
           <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <TrendingUp size={20} color="var(--color-danger)" /> Trending in Your Area
           </h3>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/citizen/map')}>See all</button>
         </div>
         <div className="card">
           {loading ? (
             <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-neutral-400)' }}>Loading...</div>
           ) : trending.map((c, i) => {
-            const emoji = DOMAIN_EMOJIS[c.domain] || '📋';
+            const IconComponent = DOMAIN_ICONS[c.domain] || ClipboardList;
             return (
               <div
                 key={c.id}
@@ -140,9 +139,9 @@ export default function CitizenHome() {
                   width: 36, height: 36, borderRadius: 10,
                   background: 'var(--color-neutral-100)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 18, flexShrink: 0,
+                  color: 'var(--color-primary)', flexShrink: 0,
                 }}>
-                  {emoji}
+                  <IconComponent size={20} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>

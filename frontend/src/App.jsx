@@ -11,7 +11,6 @@ import LoginPage from './pages/LoginPage';
 import CitizenHome from './pages/citizen/CitizenHome';
 import CitizenSubmit from './pages/citizen/CitizenSubmit';
 import CitizenSubmitSuccess from './pages/citizen/CitizenSubmitSuccess';
-import CitizenMap from './pages/citizen/CitizenMap';
 import CitizenHeatmap from './pages/citizen/CitizenHeatmap';
 import CitizenTracking from './pages/citizen/CitizenTracking';
 import CitizenTrackingDetail from './pages/citizen/CitizenTrackingDetail';
@@ -35,7 +34,6 @@ const PAGE_TITLES = {
   '/citizen/home': 'Citizen Home',
   '/citizen/submit': 'Submit Complaint',
   '/citizen/submit/success': 'Submission Complete',
-  '/citizen/map': 'Nearby Map',
   '/citizen/heatmap': 'Heatmap',
   '/citizen/tracking': 'My Complaints',
   '/citizen/profile': 'Profile',
@@ -83,7 +81,6 @@ function AppRoutes() {
         { path: '/citizen/home', El: CitizenHome },
         { path: '/citizen/submit', El: CitizenSubmit },
         { path: '/citizen/submit/success', El: CitizenSubmitSuccess },
-        { path: '/citizen/map', El: CitizenMap },
         { path: '/citizen/heatmap', El: CitizenHeatmap },
         { path: '/citizen/tracking', El: CitizenTracking },
         { path: '/citizen/tracking/:id', El: CitizenTrackingDetail },
