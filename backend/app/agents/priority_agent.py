@@ -239,6 +239,28 @@ async def _get_equity_multiplier(ward_id: int | None, equity_weight: float) -> t
     return 1.0, 0.0
 
 
+async def _get_building_density_score(lat: float, lng: float) -> tuple[float, int]:
+    """
+    Calculates Area Importance (A) dynamically using building footprints.
+    Counts structures within a 250m radius (Earth radius ≈ 6,378,100 m).
+    """
+    try:
+        db = get_db()
+        radius_rad = 250 / 6378100 
+        count = await db["buildings"].count_documents({
+            "loc": {
+                "$geoWithin": {
+                    "$centerSphere": [[lng, lat], radius_rad]
+                }
+            }
+        })
+        # Score normalization: 0 buildings -> 2.0 (baseline), >= 150 buildings -> 10.0
+        score = min(10.0, 2.0 + (count / 150.0) * 8.0)
+        return round(score, 2), count
+    except Exception as e:
+        print(f"[Agent3/Density] Building density fetch failed: {e}")
+        return 5.0, 0
+
 async def _get_domain_risk_bonuses() -> dict:
     try:
         config = await config_col().find_one({"_id": "domain_risk_bonus"})
@@ -281,7 +303,7 @@ async def run_priority_agent(
     Performs all three sub-steps internally:
       3a. Context Lookup  (grid → ward → city defaults)
       3b. Ward Resolution (GPS → ward_id → poverty_index)
-      3c. RFM+A Scoring   (full formula)
+      3c. RFM+A Scoring   (full formula with true building density override)
 
     Returns:
         (PriorityAssessment, context_indicators dict, resolved ward_id)
@@ -345,8 +367,12 @@ async def run_priority_agent(
     # E: Executive Response Mean — performance signal, NOT pressure valve
     exec_response_mean = await _get_exec_response_mean(assigned_department)
 
-    # A: Area Importance with equity adjustment
-    raw_area = float(context.get("area_importance_score", 5.0))
+    # A: Area Importance — Override with dynamic building density (MongoDB geospatials)
+    density_score, building_count = await _get_building_density_score(latitude, longitude)
+    context["nearby_buildings_count"] = building_count
+    context["area_importance_score"] = density_score
+
+    raw_area = float(density_score)
     equity_multiplier, _ = await _get_equity_multiplier(ward_id, equity_weight)
     area_adjusted = min(10.0, raw_area * equity_multiplier)
     equity_adjustment = area_adjusted - raw_area

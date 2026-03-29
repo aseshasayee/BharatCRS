@@ -37,11 +37,11 @@ export default function AdminIssues() {
     const reportId = c.common_metadata?.report_id || '';
     const priority = c.priority_assessment?.priority_class || '';
     const primaryDomain = c.domain_classification?.primary_domain || '';
-    // map category ID to name for local filtering if needed
     
     return (!search || reportId.toLowerCase().includes(search.toLowerCase())) &&
       (!filters.priority || priority.toLowerCase() === filters.priority.toLowerCase()) &&
-      (!filters.status || status.toLowerCase() === filters.status.toLowerCase());
+      (!filters.status || status.toLowerCase() === filters.status.toLowerCase()) &&
+      (!filters.category || primaryDomain === filters.category);
   });
 
   const toggleSelect = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -51,9 +51,10 @@ export default function AdminIssues() {
     if (!bulkDept) { addToast('Select a department first', 'warning'); return; }
     try {
       for (let id of selected) {
+        const c = complaints.find(comp => comp.common_metadata?.report_id === id);
         await complaintService.adminOverride(id, {
           new_department: bulkDept,
-          new_priority_class: "Medium", // Keeping default or existing
+          new_priority_class: c?.priority_assessment?.priority_class || "Medium",
           new_sla_hours: 48,
           override_reason: "Bulk assignment via Admin"
         });
@@ -112,7 +113,7 @@ export default function AdminIssues() {
           <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-primary)' }}>{selected.length} selected</span>
           <select className="form-select" style={{ width: 200 }} value={bulkDept} onChange={e => setBulkDept(e.target.value)}>
             <option value="">Assign to department...</option>
-            {DEPARTMENTS.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           <button className="btn btn-primary btn-sm" onClick={handleBulkAssign}><UserCheck size={13} /> Assign</button>
           <button className="btn btn-danger btn-sm" onClick={() => addToast(`${selected.length} complaints escalated`, 'warning')}><AlertTriangle size={13} /> Escalate</button>
@@ -125,8 +126,31 @@ export default function AdminIssues() {
       <div className="card">
         <div className="card-header">
           <span style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>{filtered.length} complaints</span>
-          <button className="btn btn-secondary btn-sm" style={{ gap: 6 }}>
-            <Download size={13} /> Export
+          <button className="btn btn-secondary btn-sm" style={{ gap: 6 }} onClick={() => {
+            const csvData = [
+              ['Report ID', 'Status', 'Priority', 'Category', 'Assigned Dept', 'Submitted Date', 'Upvotes', 'Ward'],
+              ...filtered.map(c => [
+                c.common_metadata?.report_id || 'N/A',
+                c.common_metadata?.status || 'SUBMITTED',
+                c.priority_assessment?.priority_class || 'LOW',
+                c.domain_classification?.primary_domain || 'Unknown',
+                c.governance_and_sla?.assigned_department || 'Unassigned',
+                new Date(c.common_metadata?.submission_timestamp).toLocaleDateString(),
+                c.community_engagement?.upvotes || 0,
+                c.spatio_temporal_core?.administrative_unit?.ward_id || 'N/A'
+              ])
+            ].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\\n');
+            const blob = new Blob([csvData], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `complaints_export_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}>
+            <Download size={13} /> Export Tracker
           </button>
         </div>
         <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
@@ -212,7 +236,7 @@ export default function AdminIssues() {
                   <label className="form-label">Assign to Department</label>
                   <select className="form-select" id="modal-dept-select">
                     <option value="">Select department...</option>
-                    {DEPARTMENTS.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
               )}

@@ -84,7 +84,7 @@ export function mapComplaint(c) {
     upvotes: c.community_engagement?.upvotes || c.common_metadata?.community_upvotes || 0,
     submittedAt: c.common_metadata?.submission_timestamp,
     resolvedAt: c.common_metadata?.resolved_at,
-    citizen_id: c.common_metadata?.citizen_id || '',
+    citizen_id: c.common_metadata?.user_id || c.common_metadata?.citizen_id || '',
     sla_breached: c.governance_and_sla?.sla_breached || false,
   };
 }

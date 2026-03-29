@@ -70,3 +70,13 @@ ml/*.onnx
 *.log
 *.tmp
 *.temp
+
+# -----------------------------
+# Frontend (Vite) / Data
+# -----------------------------
+frontend/dist/
+frontend/build/
+frontend/.vite/
+backend/uploads/
+backend/test*/
+ml/v7_development/

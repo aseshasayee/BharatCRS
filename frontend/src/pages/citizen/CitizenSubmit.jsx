@@ -7,7 +7,7 @@ import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps';
 
 export default function CitizenSubmit() {
   const navigate = useNavigate();
-  const { addToast } = useApp();
+  const { user, addToast } = useApp();
   
   // Form State
   const [files, setFiles] = useState([]);
@@ -15,7 +15,6 @@ export default function CitizenSubmit() {
   const [position, setPosition] = useState(null); // [lat, lng]
   const [locationText, setLocationText] = useState('');
   const [language, setLanguage] = useState('en');
-  const [isAnonymous, setIsAnonymous] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
   
   // UI State
@@ -23,6 +22,38 @@ export default function CitizenSubmit() {
   const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      
+      recognitionRef.current.onresult = (event) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setDescription(prev => prev + (prev ? ' ' : '') + finalTranscript.trim());
+        }
+      };
+      
+      recognitionRef.current.onerror = (event) => {
+        console.error("Speech recognition error", event.error);
+        setRecording(false);
+        addToast("Voice error: " + event.error, "error");
+      };
+      
+      recognitionRef.current.onend = () => {
+        setRecording(false);
+      };
+    }
+  }, []);
 
   // Helper to fetch location name
   const updatePosition = async (lat, lng) => {
@@ -80,11 +111,24 @@ export default function CitizenSubmit() {
   };
 
   const toggleRecord = () => {
-    setRecording(r => !r);
+    if (!recognitionRef.current) {
+      addToast('Voice input is not supported in this browser.', 'warning');
+      return;
+    }
+    
     if (recording) {
-      // Mock transcription
-      setDescription(prev => prev + (prev ? ' ' : '') + 'Pothole on the main road causing traffic delays.');
-      addToast('Voice transcribed successfully!', 'success');
+      recognitionRef.current.stop();
+      setRecording(false);
+    } else {
+      try {
+        recognitionRef.current.lang = language === 'ta' ? 'ta-IN' : language === 'hi' ? 'hi-IN' : 'en-IN';
+        recognitionRef.current.start();
+        setRecording(true);
+        addToast('Listening... Speak now.', 'success');
+      } catch (e) {
+        console.error(e);
+        setRecording(false);
+      }
     }
   };
 
@@ -106,7 +150,10 @@ export default function CitizenSubmit() {
       formData.append('longitude', position[1]);
       formData.append('language', language);
       formData.append('submission_channel', 'Web App');
-      formData.append('is_anonymous', isAnonymous ? 'true' : 'false');
+      formData.append('is_anonymous', 'false');
+      if (user?.name) {
+        formData.append('user_id', user.name);
+      }
       
       if (files.length > 0) {
         formData.append('photo', files[0]); // Only taking the first photo for now
@@ -129,7 +176,7 @@ export default function CitizenSubmit() {
       <div style={{ display: 'flex', flex: 1, gap: '20px', overflow: 'hidden' }}>
         
         {/* STEP 1: ISSUE DETAILS */}
-        <div className="card" onClick={() => activeStep !== 1 && setActiveStep(1)} style={{ flex: activeStep === 1 ? 5 : 0.8, transition: 'flex 0.4s cubic-bezier(0.4, 0, 0.2, 1)', cursor: activeStep === 1 ? 'default' : 'pointer', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: activeStep === 1 ? 1 : 0.8, borderRadius: 20 }}>
+        <div className="card" onClick={() => activeStep !== 1 && setActiveStep(1)} style={{ flex: activeStep === 1 ? 5 : 0.8, transition: 'flex 0.4s cubic-bezier(0.4, 0, 0.2, 1)', cursor: activeStep === 1 ? 'default' : 'pointer', border: '1px solid var(--color-neutral-200)', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: activeStep === 1 ? 1 : 0.8, borderRadius: 20 }}>
           {activeStep === 1 ? (
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '28px', gap: '20px', overflow: 'hidden', background: 'linear-gradient(to bottom right, #ffffff, #f8faff)' }}>
               
@@ -142,14 +189,6 @@ export default function CitizenSubmit() {
                     <option value="ta">Tamil (தமிழ்)</option>
                     <option value="hi">Hindi (हिंदी)</option>
                   </select>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, color: 'var(--color-neutral-600)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                    Anonymous
-                    <div onClick={() => setIsAnonymous(!isAnonymous)} style={{ width: 48, height: 26, borderRadius: 13, background: isAnonymous ? 'var(--color-primary)' : 'var(--color-neutral-300)', position: 'relative', cursor: 'pointer', transition: '0.3s', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' }}>
-                      <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: isAnonymous ? 24 : 2, transition: '0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}/>
-                    </div>
-                  </label>
                 </div>
               </div>
 
@@ -182,7 +221,7 @@ export default function CitizenSubmit() {
         </div>
 
         {/* STEP 2: PHOTO EVIDENCE */}
-        <div className="card" onClick={() => activeStep !== 2 && setActiveStep(2)} style={{ flex: activeStep === 2 ? 5 : 0.8, transition: 'flex 0.4s cubic-bezier(0.4, 0, 0.2, 1)', cursor: activeStep === 2 ? 'default' : 'pointer', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: activeStep === 2 ? 1 : 0.8, borderRadius: 20 }}>
+        <div className="card" onClick={() => activeStep !== 2 && setActiveStep(2)} style={{ flex: activeStep === 2 ? 5 : 0.8, transition: 'flex 0.4s cubic-bezier(0.4, 0, 0.2, 1)', cursor: activeStep === 2 ? 'default' : 'pointer', border: '1px solid var(--color-neutral-200)', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: activeStep === 2 ? 1 : 0.8, borderRadius: 20 }}>
           {activeStep === 2 ? (
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '28px', overflow: 'hidden', background: 'linear-gradient(to bottom right, #ffffff, #f8faff)' }}>
               <h3 className="card-title" style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 20, margin: 0, marginBottom: 24, fontWeight: 700, color: 'var(--color-neutral-800)' }}>
@@ -243,7 +282,7 @@ export default function CitizenSubmit() {
         </div>
 
         {/* STEP 3: LOCATION */}
-        <div className="card" onClick={() => activeStep !== 3 && setActiveStep(3)} style={{ flex: activeStep === 3 ? 5 : 0.8, transition: 'flex 0.4s cubic-bezier(0.4, 0, 0.2, 1)', cursor: activeStep === 3 ? 'default' : 'pointer', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: activeStep === 3 ? 1 : 0.8, borderRadius: 20 }}>
+        <div className="card" onClick={() => activeStep !== 3 && setActiveStep(3)} style={{ flex: activeStep === 3 ? 5 : 0.8, transition: 'flex 0.4s cubic-bezier(0.4, 0, 0.2, 1)', cursor: activeStep === 3 ? 'default' : 'pointer', border: '1px solid var(--color-neutral-200)', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: activeStep === 3 ? 1 : 0.8, borderRadius: 20 }}>
           {activeStep === 3 ? (
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '28px', overflow: 'hidden', background: 'linear-gradient(to bottom right, #ffffff, #f8faff)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>

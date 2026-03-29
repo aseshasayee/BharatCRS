@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useApp } from '../../context/AppContext';
 import { formatDate, timeAgo } from '../../utils/helpers';
 import { complaintService } from '../../services/complaintService';
 import { StatusBadge, PriorityBadge, CategoryChip, EmptyState } from '../../components/SharedComponents';
 import { Search, ChevronRight, MapPin, Calendar } from 'lucide-react';
 
 export default function CitizenTracking() {
+  const { user } = useApp();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -15,7 +17,8 @@ export default function CitizenTracking() {
   useEffect(() => {
     const fetchComplaints = async () => {
       try {
-        const data = await complaintService.listComplaints({ limit: 10 });
+        const userId = user?.name || '';
+        const data = await complaintService.listComplaints({ limit: 50, user_id: userId });
         setComplaints(data || []);
       } catch (err) {
         console.error('Failed to fetch tracking complaints:', err);
@@ -24,7 +27,7 @@ export default function CitizenTracking() {
       }
     };
     fetchComplaints();
-  }, []);
+  }, [user?.name]);
 
   const filtered = complaints.filter(c => {
     const status = c.common_metadata?.status || '';

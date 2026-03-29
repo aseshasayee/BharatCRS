@@ -402,6 +402,7 @@ async def store_node(state: GraphState) -> GraphState:
             "community_upvotes": request.get("community_upvotes", 0),
             "community_comments_count": 0,
             "is_anonymous_flag": request.get("is_anonymous", True),
+            "user_id": request.get("user_id"),
         },
         "spatio_temporal_core": {
             "location": {
@@ -428,6 +429,10 @@ async def store_node(state: GraphState) -> GraphState:
             "vulnerable_population_flag": context_indicators.get("vulnerable_population_flag", False),
             "area_importance_score": context_indicators.get("area_importance_score"),
             "context_source": context_indicators.get("context_source"),
+            "weather_condition": context_indicators.get("weather_condition"),
+            "temporal_context": context_indicators.get("temporal_context"),
+            "active_event_proximity": context_indicators.get("active_event_proximity", False),
+            "nearby_buildings_count": context_indicators.get("nearby_buildings_count", 0),
         },
         "systemic_pattern_metrics": {
             "recurring_issue_flag": duplicate.get("is_duplicate", False),

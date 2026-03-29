@@ -138,6 +138,7 @@ async def list_complaints(
     status: Annotated[str | None, Query()] = None,
     department: Annotated[str | None, Query()] = None,
     priority_class: Annotated[str | None, Query()] = None,
+    user_id: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     skip: Annotated[int, Query(ge=0)] = 0,
 ) -> list[dict]:
@@ -153,6 +154,12 @@ async def list_complaints(
         query["governance_and_sla.assigned_department"] = department
     if priority_class:
         query["priority_assessment.priority_class"] = priority_class
+    if user_id:
+        # Check either user_id or citizen_id for backward compatibility
+        query["$or"] = [
+            {"common_metadata.user_id": user_id},
+            {"common_metadata.citizen_id": user_id}
+        ]
 
     complaints = []
     cursor = complaints_col().find(query, {"_id": 0}).sort(
@@ -232,20 +239,33 @@ async def trigger_monitoring() -> dict:
 # ─── GET /api/stats — Dashboard KPIs ─────────────────────────────────────────
 
 @router.get("/stats")
-async def get_stats() -> dict:
+async def get_stats(user_id: Annotated[str | None, Query()] = None) -> dict:
     """Returns dashboard KPI metrics."""
-    total = await complaints_col().count_documents({})
+    query = {}
+    if user_id:
+        query["$or"] = [
+            {"common_metadata.user_id": user_id},
+            {"common_metadata.citizen_id": user_id}
+        ]
+
+    total = await complaints_col().count_documents(query)
     resolved = await complaints_col().count_documents(
-        {"common_metadata.status": ComplaintStatus.RESOLVED.value}
+        {**query, "common_metadata.status": ComplaintStatus.RESOLVED.value}
     )
     breached = await complaints_col().count_documents(
-        {"common_metadata.status": ComplaintStatus.SLA_BREACHED.value}
+        {**query, "common_metadata.status": ComplaintStatus.SLA_BREACHED.value}
     )
     human_review = await complaints_col().count_documents(
-        {"common_metadata.status": ComplaintStatus.HUMAN_REVIEW.value}
+        {**query, "common_metadata.status": ComplaintStatus.HUMAN_REVIEW.value}
     )
     assigned = await complaints_col().count_documents(
-        {"common_metadata.status": ComplaintStatus.ASSIGNED.value}
+        {**query, "common_metadata.status": ComplaintStatus.ASSIGNED.value}
+    )
+    in_progress = await complaints_col().count_documents(
+        {**query, "common_metadata.status": ComplaintStatus.IN_PROGRESS.value}
+    )
+    in_process = await complaints_col().count_documents(
+        {**query, "common_metadata.status": ComplaintStatus.IN_PROCESS.value}
     )
 
     sla_rate = round((resolved / total * 100), 1) if total > 0 else 0
@@ -262,6 +282,8 @@ async def get_stats() -> dict:
         "sla_breached": breached,
         "human_review": human_review,
         "assigned": assigned,
+        "in_progress": in_progress,
+        "in_process": in_process,
         "sla_compliance_rate": sla_rate,
         "department_metrics": dept_metrics,
     }

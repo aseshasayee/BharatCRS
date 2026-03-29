@@ -262,15 +262,15 @@ export default function CitizenTrackingDetail() {
                 </div>
               </div>
             </div>
-
-            {/* Agent 1.5 - CLIP */}
-            {meta.has_photo && (
+             {/* Agent 1.5 - CLIP */}
+            {(meta.has_photo || c.clip_validation) && (
                <div style={{ borderLeft: '3px solid #8b5cf6', paddingLeft: 12 }}>
                  <h4 style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, color: '#a78bfa' }}><Eye size={14} /> Agent 1.5: CLIP Multi-Modal Verifier</h4>
                  <div style={{ background: '#252526', borderRadius: 4, padding: '10px 12px' }}>
                     <div style={{ marginBottom: 4 }}><strong style={{color:'#858585'}}>Image Embedding Shape:</strong> [1, 512]</div>
-                    <div style={{ marginBottom: 4 }}><strong style={{color:'#858585'}}>Text Embedding Match ("{formatSlug(domain.issue_type)}"):</strong> <span style={{ color: '#4ade80' }}>0.82 Cosine Similarity</span></div>
-                    <div><strong style={{color:'#858585'}}>Verification Status:</strong> {c.agent_traceability?.clip_verified === false ? <span style={{ color: '#f87171' }}>TAMPERED/MISMATCH</span> : <span style={{ color: '#4ade80' }}>AUTHENTICATED</span>}</div>
+                    <div style={{ marginBottom: 4 }}><strong style={{color:'#858585'}}>CLIP Match Probability:</strong> <span style={{ color: (c.clip_validation?.match_probability > 0.5) ? '#4ade80' : '#f87171' }}>{(c.clip_validation?.match_probability || 0.0).toFixed(3)}</span></div>
+                    <div style={{ marginBottom: 4 }}><strong style={{color:'#858585'}}>Target Reasoning Label:</strong> <span style={{ color: '#9cdcfe' }}>"{c.clip_validation?.top_labels?.[0] || 'civic_issue_detection'}"</span></div>
+                    <div><strong style={{color:'#858585'}}>Verification Status:</strong> {c.clip_validation?.is_match === false ? <span style={{ color: '#f87171' }}>TAMPERED/MISMATCH (Flag: Human Review)</span> : <span style={{ color: '#4ade80' }}>AUTHENTICATED</span>}</div>
                  </div>
                </div>
             )}
@@ -296,17 +296,18 @@ export default function CitizenTrackingDetail() {
               <div style={{ background: '#252526', borderRadius: 4, padding: '10px 12px' }}>
                 <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #333' }}>
                   <div style={{ marginBottom: 6 }}><strong style={{color:'#dcdcaa'}}>Environmental Injects:</strong></div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                     <div><span style={{color:'#858585'}}>- Weather:</span> {c.context_derived_indicators?.weather_condition || 'N/A'}</div>
                     <div><span style={{color:'#858585'}}>- Temporal:</span> {c.context_derived_indicators?.temporal_context || 'N/A'}</div>
-                    <div><span style={{color:'#858585'}}>- Vuln. Zone:</span> {c.context_derived_indicators?.vulnerable_population_flag ? 'Yes (weight = 1.5)' : 'No (weight = 1.0)'}</div>
-                    <div><span style={{color:'#858585'}}>- Civic Trust:</span> {c.agent_traceability?.user_trust_score || 0.5} (multiplier)</div>
+                    <div><span style={{color:'#858585'}}>- Active Event:</span> {c.context_derived_indicators?.active_event_proximity ? <span style={{color: '#f472b6'}}>VIP Convoy/Event Zone</span> : 'None'}</div>
+                    <div><span style={{color:'#858585'}}>- Bldg Density (RFM A):</span> {c.context_derived_indicators?.nearby_buildings_count || 0} structures</div>
+                    <div><span style={{color:'#858585'}}>- Civic Trust:</span> {(c.agent_traceability?.user_trust_score || 0.5).toFixed(2)}</div>
                   </div>
                 </div>
                 <div>
                   <div style={{ marginBottom: 6 }}><strong style={{color:'#dcdcaa'}}>Calculation Execution:</strong></div>
                   <div style={{ background: '#1e1e1e', padding: '6px 10px', borderRadius: 4, fontFamily: 'monospace', color: '#c586c0' }}>
-                    Final Score = ((Base: <b>{(priority.base_score || 5).toFixed(1)}</b>) + (Domain Bonus: <b>{priority.domain_risk_bonus || 0}</b>)) × Trust Mutliplier (<b>{(c.agent_traceability?.user_trust_score || 0.5).toFixed(2)}</b>) + Cascading (<b>{c.systemic_pattern_metrics?.cascading_failure_flag ? 3.0 : 0}</b>)
+                    Final Score = Base RFM+A (<b>{(priority.base_score || 5).toFixed(2)}</b>) + Domain Risk (<b>{priority.domain_risk_bonus || 0}</b>) + Context Bonus (<b>{Math.max(0, ((priority.priority_score || 0) - (priority.base_score || 0) - (priority.domain_risk_bonus || 0))).toFixed(2)}</b>)
                   </div>
                   <div style={{ marginTop: 8, fontSize: 14 }}>
                     <span style={{color:'#858585'}}>Calculated Output: </span> <strong style={{ color: '#4ade80' }}>{priority.priority_score || 'N/A'} / 10.0</strong> → <span>{priority.priority_class?.toUpperCase()}</span>

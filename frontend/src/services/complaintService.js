@@ -20,11 +20,21 @@ export const complaintService = {
     if (filters.status) params.append('status', filters.status);
     if (filters.department) params.append('department', filters.department);
     if (filters.priority_class) params.append('priority_class', filters.priority_class);
+    if (filters.user_id) params.append('user_id', filters.user_id);
     if (filters.limit) params.append('limit', filters.limit);
     if (filters.skip) params.append('skip', filters.skip);
 
     const queryString = params.toString();
     const endpoint = `/complaints${queryString ? `?${queryString}` : ''}`;
+    return await fetchApi(endpoint, { method: 'GET' });
+  },
+  
+  getStats: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.user_id) params.append('user_id', filters.user_id);
+    
+    const queryString = params.toString();
+    const endpoint = `/stats${queryString ? `?${queryString}` : ''}`;
     return await fetchApi(endpoint, { method: 'GET' });
   },
 

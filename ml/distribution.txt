@@ -1,0 +1,8 @@
+primary_domain
+Core Infrastructure & Public Works       5053
+Urban Planning & Real Estate             3439
+Social Infrastructure & Public Health    3227
+Emergency, Safety & Accountability       2975
+Sanitation, Environment & Parks          2779
+Transportation & Traffic                 2527
+Name: count, dtype: int64

@@ -6,7 +6,6 @@ import { complaintService } from '../../services/complaintService';
 import { MetricCard, StatusBadge, PriorityBadge } from '../../components/SharedComponents';
 import { useApp } from '../../context/AppContext';
 import { Clock, AlertTriangle, ClipboardList, CheckCircle2, BarChart2 } from 'lucide-react';
-import { CHART_DEPT_SLA } from '../../data/mockData';
 
 export default function DeptDashboard() {
   const { addToast, user } = useApp();
@@ -17,14 +16,47 @@ export default function DeptDashboard() {
     overdue: 0
   });
   const [upcoming, setUpcoming] = useState([]);
+  const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Helper to group complaints by week (last 4 weeks)
+  const calculateSLAHistory = (complaintsList) => {
+    const now = new Date();
+    const weeks = [
+      { week: 'Week 1', compliant: 0, atRisk: 0, breached: 0, start: new Date(now.getTime() - 7 * 86400000) },
+      { week: 'Week 2', compliant: 0, atRisk: 0, breached: 0, start: new Date(now.getTime() - 14 * 86400000) },
+      { week: 'Week 3', compliant: 0, atRisk: 0, breached: 0, start: new Date(now.getTime() - 21 * 86400000) },
+      { week: 'Week 4', compliant: 0, atRisk: 0, breached: 0, start: new Date(now.getTime() - 28 * 86400000) },
+    ];
+
+    (complaintsList || []).forEach(c => {
+      const ts = new Date(c.common_metadata?.submission_timestamp);
+      const status = c.common_metadata?.status || '';
+      
+      // Determine which week bucket it falls into
+      const diffDays = Math.floor((now - ts) / (1000 * 60 * 60 * 24));
+      let targetWeek = null;
+      if (diffDays <= 7) targetWeek = weeks[0];
+      else if (diffDays <= 14) targetWeek = weeks[1];
+      else if (diffDays <= 21) targetWeek = weeks[2];
+      else if (diffDays <= 28) targetWeek = weeks[3];
+
+      if (targetWeek) {
+        if (status === 'Resolved') targetWeek.compliant++;
+        else if (status === 'SLA_Breached') targetWeek.breached++;
+        else targetWeek.atRisk++; // pending issues are counted as at risk/progress
+      }
+    });
+
+    return weeks.map(({ week, compliant, atRisk, breached }) => ({ week, compliant, atRisk, breached })).reverse();
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [statsData, complaintsData] = await Promise.all([
            statsService.getStats(),
-           complaintService.listComplaints({ limit: 10, department: user?.department })
+           complaintService.listComplaints({ limit: 200, department: user?.department })
         ]);
         
         let deptMetrics = null;
@@ -38,6 +70,9 @@ export default function DeptDashboard() {
           slaCompliant: deptMetrics ? Math.round(deptMetrics.sla_compliance_rate * 100) : 0,
           overdue: statsData.sla_breached || 0
         });
+
+        // Set up the SLA Chart
+        setChartData(calculateSLAHistory(complaintsData));
 
         const filtered = (complaintsData || []).filter(c => c.common_metadata?.status?.toLowerCase() !== 'resolved').slice(0, 3);
         setUpcoming(filtered);
@@ -67,7 +102,7 @@ export default function DeptDashboard() {
         </div>
         <div style={{ padding: '12px 24px 20px' }}>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={CHART_DEPT_SLA} barSize={18}>
+            <BarChart data={chartData} barSize={18}>
               <XAxis dataKey="week" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />

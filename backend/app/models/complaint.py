@@ -69,6 +69,7 @@ class CommonMetadata(BaseModel):
     community_upvotes: int = Field(default=0, ge=0)
     community_comments_count: int = Field(default=0, ge=0)
     is_anonymous_flag: bool = True
+    user_id: str | None = Field(default=None, description="Username or ID of the submitting citizen")
 
 
 # ─── Section 2: Spatio-Temporal Core ──────────────────────────────────────────

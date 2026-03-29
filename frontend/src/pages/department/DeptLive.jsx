@@ -41,6 +41,7 @@ export default function DeptLive() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header section... no changes needed to structure */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontFamily: 'Poppins', fontSize: 24, fontWeight: 700 }}>Live Updates</h2>
@@ -71,7 +72,7 @@ export default function DeptLive() {
       {/* Stats bar */}
       <div style={{ display: 'flex', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-danger-light)', borderRadius: 10, padding: '10px 16px', fontSize: 13, color: 'var(--color-danger)', fontWeight: 600 }}>
-          <Circle fill="currentColor" size={10} style={{ marginRight: 6 }} /> {displayed.filter(i => i.priority === 'high').length} High Priority
+          <Circle fill="currentColor" size={10} style={{ marginRight: 6 }} /> {displayed.filter(i => i.priority === 'High' || i.priority === 'Critical').length} Critical/High
         </div>
         <div style={{ background: 'var(--color-primary-light)', borderRadius: 10, padding: '10px 16px', fontSize: 13, color: 'var(--color-primary)', fontWeight: 600 }}>
           {displayed.length} Total Incoming
@@ -85,25 +86,30 @@ export default function DeptLive() {
 
       {/* Live feed */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {displayed.map((issue, i) => (
+        {displayed.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-neutral-500)', background: 'white', borderRadius: 'var(--radius-md)', border: '1px dashed var(--color-neutral-300)' }}>
+            No incoming complaints for {user?.department || 'your department'} currently.
+          </div>
+        ) : displayed.map((issue, i) => (
           <div key={issue.id}
             className="card"
             style={{
               borderLeft: (issue.priority === 'High' || issue.priority === 'Critical') ? '4px solid var(--color-danger)' : '4px solid var(--color-warning)',
-              animation: i === 0 ? 'slideDown 0.3s ease' : 'none',
             }}>
             <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
                   <PriorityBadge priority={issue.priority} />
-                  <CategoryChip category={issue.category} />
+                  <span style={{ padding: '2px 8px', borderRadius: 4, background: 'var(--color-neutral-100)', fontSize: 11, fontWeight: 600, color: 'var(--color-neutral-600)' }}>
+                    {issue.domain}
+                  </span>
                   <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--color-neutral-600)' }}>{issue.id}</span>
                 </div>
                 <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{issue.title}</p>
                 <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--color-neutral-600)' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={12} /> {issue.ward}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={12} /> {issue.citizenName}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={12} /> {timeAgo(issue.time.toISOString())}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={12} /> {issue.ward || 'Chennai'}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={12} /> {issue.citizen_id || 'Anonymous'}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={12} /> {timeAgo(issue.submittedAt)}</span>
                 </div>
               </div>
               <button

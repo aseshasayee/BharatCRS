@@ -85,6 +85,10 @@ export default function NavBar() {
 
   const roleColor = ROLE_COLORS[role] || '#3B82F6';
 
+  const displayUserName = user?.name?.length >= 10 && !isNaN(user?.name) 
+    ? `+91 ${user.name.substring(0,5)} ${user.name.substring(5)}` 
+    : user?.name || 'User';
+
   return (
     <header className="navbar">
       {/* Brand */}
@@ -142,26 +146,28 @@ export default function NavBar() {
         )}
 
         {/* Transparency Mode Toggle */}
-        <button 
-          onClick={() => setShowWorkingView(!showWorkingView)}
-          title="Toggle UI Transparency / Agent Working View"
-          style={{ 
-            background: showWorkingView ? 'var(--color-primary-light)' : 'transparent',
-            color: showWorkingView ? 'var(--color-primary)' : 'var(--color-neutral-600)',
-            border: `1px solid ${showWorkingView ? 'var(--color-primary)' : 'var(--color-neutral-300)'}`,
-            padding: '4px 10px',
-            borderRadius: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          <Terminal size={14} />
-          {showWorkingView ? 'Agent View: ON' : 'Agent View: OFF'}
-        </button>
+        {role !== 'department' && (
+          <button 
+            onClick={() => setShowWorkingView(!showWorkingView)}
+            title="Toggle UI Transparency / Agent Working View"
+            style={{ 
+              background: showWorkingView ? 'var(--color-primary-light)' : 'transparent',
+              color: showWorkingView ? 'var(--color-primary)' : 'var(--color-neutral-600)',
+              border: `1px solid ${showWorkingView ? 'var(--color-primary)' : 'var(--color-neutral-300)'}`,
+              padding: '4px 10px',
+              borderRadius: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            <Terminal size={14} />
+            {showWorkingView ? 'Agent View: ON' : 'Agent View: OFF'}
+          </button>
+        )}
 
         {/* Live Indicator */}
         <div className="navbar-live-badge">
@@ -214,7 +220,7 @@ export default function NavBar() {
               {user?.initials || (user?.name?.[0] || '?')}
             </div>
             <div className="navbar-user-info">
-              <span className="navbar-user-name">{user?.name || 'User'}</span>
+                <span className="navbar-user-name">{displayUserName}</span>
               <span className="navbar-user-role">{ROLE_LABELS[role]}</span>
             </div>
             <ChevronDown size={14} style={{ color: 'var(--color-neutral-400)', transition: 'transform 0.2s', transform: userOpen ? 'rotate(180deg)' : 'none' }} />
@@ -225,7 +231,7 @@ export default function NavBar() {
               <div className="navbar-dropdown-profile">
                 <div className="navbar-avatar-lg" style={{ background: roleColor }}>{user?.initials || '?'}</div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{user?.name || 'User'}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{displayUserName}</div>
                   <div style={{ fontSize: 12, color: 'var(--color-neutral-400)' }}>{ROLE_LABELS[role]}</div>
                 </div>
               </div>

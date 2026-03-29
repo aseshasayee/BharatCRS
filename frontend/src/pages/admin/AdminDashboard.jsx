@@ -66,11 +66,23 @@ export default function AdminDashboard() {
 
   // Simple complaints-over-time: bucket recent by day
   const dayMap = {};
+  const current = new Date();
+  for (let i = 6; i >= 0; i--) {
+      const d = new Date(current);
+      d.setDate(d.getDate() - i);
+      const label = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+      dayMap[label] = 0;
+  }
+
   recent.forEach(c => {
     const d = c.common_metadata?.submission_timestamp;
     if (!d) return;
     const label = new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-    dayMap[label] = (dayMap[label] || 0) + 1;
+    if (dayMap[label] !== undefined) {
+      dayMap[label] = dayMap[label] + 1;
+    } else {
+      dayMap[label] = 1;
+    }
   });
   const chartOverTime = Object.entries(dayMap).map(([date, complaints]) => ({ date, complaints })).slice(-7);
 
